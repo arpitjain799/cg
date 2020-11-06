@@ -41,6 +41,22 @@ def test_start(cli_runner, balsamic_context: dict, mock_config, caplog):
     assert case_id in caplog.text
 
 
+def test_start_qc(cli_runner, balsamic_context: dict, mock_config, caplog):
+    """Test to ensure all parts of start command will run successfully given ideal conditions"""
+    caplog.set_level(logging.INFO)
+
+    # GIVEN case id for which we created a config file
+    case_id = "balsamic_case_wgs_single"
+
+    # WHEN dry running with dry specified
+    result = cli_runner.invoke(start, [case_id, "-a", "qc", "--dry-run"], obj=balsamic_context)
+
+    # THEN command should execute successfully
+    assert result.exit_code == EXIT_SUCCESS
+    assert case_id in caplog.text
+    assert "--analysis-type qc" in caplog.text
+
+
 def test_store(
     cli_runner,
     balsamic_context: dict,
