@@ -1,7 +1,7 @@
 """Contains API to communicate with LIMS"""
 import datetime as dt
 import logging
-from typing import Generator
+from typing import Generator, Dict
 
 # fixes https://github.com/Clinical-Genomics/servers/issues/30
 import requests_cache
@@ -40,9 +40,11 @@ LOG = logging.getLogger(__name__)
 class LimsAPI(Lims, OrderHandler):
     """API to communicate with LIMS"""
 
-    def __init__(self, config):
-        lconf = config["lims"]
-        super(LimsAPI, self).__init__(lconf["host"], lconf["username"], lconf["password"])
+    def __init__(self, config: dict):
+        lims_config: Dict[str, str] = config["lims"]
+        super(LimsAPI, self).__init__(
+            lims_config["host"], lims_config["username"], lims_config["password"]
+        )
 
     def sample(self, lims_id: str):
         """Fetch a sample from the LIMS database."""

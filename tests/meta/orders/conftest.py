@@ -1,10 +1,10 @@
 import json
 
 import pytest
-
 from cg.apps.lims import LimsAPI, limsjson
 from cg.apps.osticket import OsTicket
 from cg.meta.orders import OrdersAPI, OrderType
+from cg.meta.orders.rml_order_form import StatusData
 from cg.meta.orders.status import StatusHandler
 
 
@@ -50,10 +50,9 @@ def all_orders_to_submit(
 
 
 @pytest.fixture
-def rml_status_data(rml_order_to_submit):
+def rml_status_data(rml_order_to_submit: dict) -> StatusData:
     """Parse rml order example."""
-    data = StatusHandler.pools_to_status(rml_order_to_submit)
-    return data
+    return StatusHandler.pools_to_status(rml_order_to_submit)
 
 
 @pytest.fixture

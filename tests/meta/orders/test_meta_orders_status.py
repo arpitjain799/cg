@@ -1,32 +1,37 @@
 import datetime as dt
 
 import pytest
-from cg.constants import Pipeline, DataDelivery
+from cg.constants import DataDelivery, Pipeline
 from cg.exc import OrderError
+from cg.meta.orders import OrdersAPI
+from cg.meta.orders.rml_order_form import Pool, StatusData, StatusSample
 from cg.meta.orders.status import StatusHandler
+from cg.store import Store
 
 
-def test_pools_to_status(rml_order_to_submit):
+def test_pools_to_status(rml_order_to_submit: dict):
     # GIVEN a rml order with three samples in one pool
     # WHEN parsing for status
-    data = StatusHandler.pools_to_status(rml_order_to_submit)
+    from pprint import pprint as pp
+
+    status_data: StatusData = StatusHandler.pools_to_status(rml_order_to_submit)
     # THEN it should pick out the general information
-    assert data["customer"] == "cust000"
-    assert data["order"] == "ctDNA sequencing - order 9"
-    assert data["comment"] == "order comment"
+    assert status_data.customer == "cust000"
+    assert status_data.order == "ctDNA sequencing - order 9"
+    assert status_data.comment == "order comment"
 
     # ... and information about the pool(s)
-    assert len(data["pools"]) == 2
-    pool = data["pools"][0]
-    assert pool["name"] == "pool-1"
-    assert pool["application"] == "RMLS05R150"
-    assert pool["data_analysis"] == str(Pipeline.FLUFFY)
-    assert pool["data_delivery"] == str(DataDelivery.NIPT_VIEWER)
-    assert len(pool["samples"]) == 2
-    sample = pool["samples"][0]
-    assert sample["name"] == "sample1"
-    assert sample["comment"] == "test comment"
-    assert sample["priority"] == "research"
+    assert len(status_data.pools) == 2
+    pool: Pool = status_data.pools[0]
+    assert pool.name == "pool-1"
+    assert pool.application == "RMLS05R150"
+    assert pool.data_analysis == str(Pipeline.FLUFFY)
+    assert pool.data_delivery == str(DataDelivery.NIPT_VIEWER)
+    assert len(pool.samples) == 2
+    sample: StatusSample = pool.samples[0]
+    assert sample.name == "sample1"
+    assert sample.comment == "test comment"
+    assert sample.priority == "research"
 
 
 def test_samples_to_status(fastq_order_to_submit):
@@ -96,7 +101,7 @@ def test_families_to_status(mip_order_to_submit):
     assert isinstance(family["samples"][1]["comment"], str)
 
 
-def test_store_rml(orders_api, base_store, rml_status_data):
+def test_store_rml(orders_api: OrdersAPI, base_store: Store, rml_status_data: StatusData):
 
     # GIVEN a basic store with no samples and a rml order
     assert base_store.pools(customer=None).count() == 0
@@ -105,11 +110,11 @@ def test_store_rml(orders_api, base_store, rml_status_data):
 
     # WHEN storing the order
     new_pools = orders_api.store_rml(
-        customer=rml_status_data["customer"],
-        order=rml_status_data["order"],
+        customer=rml_status_data.customer,
+        order=rml_status_data.order,
         ordered=dt.datetime.now(),
         ticket=1234348,
-        pools=rml_status_data["pools"],
+        pools=rml_status_data.pools,
     )
     # THEN it should update the database with new pools
     assert len(new_pools) == 2
@@ -133,23 +138,25 @@ def test_store_rml(orders_api, base_store, rml_status_data):
     assert new_case.data_delivery == str(DataDelivery.NIPT_VIEWER)
 
 
-def test_store_rml_bad_apptag(orders_api, base_store, rml_status_data):
+def test_store_rml_bad_apptag(
+    orders_api: OrdersAPI, base_store: Store, rml_status_data: StatusData
+):
 
     # GIVEN a basic store with no samples and a rml order
     assert base_store.pools(customer=None).count() == 0
 
-    for pool in rml_status_data["pools"]:
-        pool["application"] = "nonexistingtag"
+    for pool in rml_status_data.pools:
+        pool.application = "nonexistingtag"
 
     # THEN it should raise OrderError
     with pytest.raises(OrderError):
         # WHEN storing the order
         orders_api.store_rml(
-            customer=rml_status_data["customer"],
-            order=rml_status_data["order"],
+            customer=rml_status_data.customer,
+            order=rml_status_data.order,
             ordered=dt.datetime.now(),
             ticket=1234348,
-            pools=rml_status_data["pools"],
+            pools=rml_status_data.pools,
         )
 
 

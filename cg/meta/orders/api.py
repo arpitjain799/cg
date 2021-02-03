@@ -14,11 +14,12 @@ from typing import List
 
 from cg.apps.lims import LimsAPI
 from cg.apps.osticket import OsTicket
-from cg.constants import Pipeline, DataDelivery
+from cg.constants import DataDelivery, Pipeline
 from cg.exc import OrderError, TicketCreationError
 from cg.store import Store, models
 
 from .lims import LimsHandler
+from .rml_order_form import StatusData
 from .schema import ORDER_SCHEMES, OrderType
 from .status import StatusHandler
 
@@ -175,16 +176,16 @@ class OrdersAPI(LimsHandler, StatusHandler):
 
     def _submit_rml(self, order: dict) -> dict:
         """Submit a batch of ready made libraries."""
-        status_data = self.pools_to_status(order)
+        status_data: StatusData = self.pools_to_status(order)
         project_data, lims_map = self.process_lims(order, order["samples"])
-        samples = [sample for pool in status_data["pools"] for sample in pool["samples"]]
+        samples = [sample.dict() for pool in status_data.pools for sample in pool.samples]
         self._fill_in_sample_ids(samples, lims_map, id_key="internal_id")
         new_records = self.store_rml(
-            customer=status_data["customer"],
-            order=status_data["order"],
+            customer=status_data.customer,
+            order=status_data.order,
             ordered=project_data["date"],
             ticket=order["ticket"],
-            pools=status_data["pools"],
+            pools=status_data.pools,
         )
         return {"project": project_data, "records": new_records}
 
@@ -337,10 +338,11 @@ class OrdersAPI(LimsHandler, StatusHandler):
         """Fill in LIMS sample ids."""
         for sample in samples:
             LOG.debug(f"{sample['name']}: link sample to LIMS")
-            if not sample.get(id_key):
-                internal_id = lims_map[sample["name"]]
-                LOG.info(f"{sample['name']} -> {internal_id}: connect sample to LIMS")
-                sample[id_key] = internal_id
+            if sample.get(id_key):
+                continue
+            internal_id = lims_map[sample["name"]]
+            LOG.info(f"{sample['name']} -> {internal_id}: connect sample to LIMS")
+            sample[id_key] = internal_id
 
     def _fill_in_sample_verified_organism(self, samples: List[dict]):
         for sample in samples:
@@ -353,27 +355,29 @@ class OrdersAPI(LimsHandler, StatusHandler):
             sample["verified_organism"] = is_verified
 
     def _validate_customer_on_imported_samples(self, project: OrderType, order: dict):
+        """Validate that the customer have access to all samples"""
         for sample in order.get("samples"):
 
-            if sample.get("internal_id"):
+            if sample.get("internal_id") is None:
+                continue
 
-                if project not in (
-                    OrderType.BALSAMIC,
-                    OrderType.EXTERNAL,
-                    OrderType.MIP_DNA,
-                    OrderType.MIP_RNA,
-                ):
-                    raise OrderError(
-                        f"Only MIP, Balsamic and external orders can have imported "
-                        f"samples: "
-                        f"{sample.get('name')}"
-                    )
+            if project not in (
+                OrderType.BALSAMIC,
+                OrderType.EXTERNAL,
+                OrderType.MIP_DNA,
+                OrderType.MIP_RNA,
+            ):
+                raise OrderError(
+                    f"Only MIP, Balsamic and external orders can have imported "
+                    f"samples: "
+                    f"{sample.get('name')}"
+                )
 
-                existing_sample = self.status.sample(sample.get("internal_id"))
-                data_customer = self.status.customer(order["customer"])
+            existing_sample = self.status.sample(sample.get("internal_id"))
+            data_customer = self.status.customer(order["customer"])
 
-                if existing_sample.customer.customer_group_id != data_customer.customer_group_id:
-                    raise OrderError(f"Sample not available: {sample.get('name')}")
+            if existing_sample.customer.customer_group_id != data_customer.customer_group_id:
+                raise OrderError(f"Sample not available: {sample.get('name')}")
 
     def _get_submit_func(self, project_type: OrderType) -> typing.Callable:
         """Get the submit method to call for the given type of project"""

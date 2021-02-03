@@ -1,9 +1,10 @@
 """Ordering module"""
 import datetime as dt
-from typing import List
+from typing import Dict, List, Optional
 
 from cg.constants import DataDelivery, Pipeline
 from cg.exc import OrderError
+from cg.meta.orders.rml_order_form import Pool, RMLOrderform, StatusData, StatusSample
 from cg.store import models
 
 
@@ -25,67 +26,31 @@ class StatusHandler:
         return cases
 
     @staticmethod
-    def pools_to_status(data: dict) -> dict:
+    def pools_to_status(data: dict) -> StatusData:
         """Convert input to pools."""
 
-        status_data = {
-            "customer": data["customer"],
-            "order": data["name"],
-            "comment": data["comment"],
-            "pools": [],
-        }
-
-        # group pools
+        validated_form: RMLOrderform = RMLOrderform(**data)
         pools = {}
-
-        for sample in data["samples"]:
-            pool_name = sample["pool"]
-            application = sample["application"]
-            data_analysis = sample["data_analysis"]
-            data_delivery = sample.get("data_delivery")
-
+        for sample in validated_form.samples:
+            pool_name: str = sample.pool
             if pool_name not in pools:
-                pools[pool_name] = {}
-                pools[pool_name]["name"] = pool_name
-                pools[pool_name]["applications"] = set()
-                pools[pool_name]["samples"] = []
-
-            pools[pool_name]["samples"].append(sample)
-            pools[pool_name]["applications"].add(application)
-
-        # each pool must only have one application type
-        for pool in pools.values():
-
-            applications = pool["applications"]
-            pool_name = pool["name"]
-            if len(applications) != 1:
-                raise OrderError(f"different application in pool: {pool_name} - {applications}")
-
-        for pool in pools.values():
-
-            pool_name = pool["name"]
-            applications = pool["applications"]
-            application = applications.pop()
-            pool_samples = pool["samples"]
-
-            status_data["pools"].append(
-                {
+                pools[pool_name] = {
                     "name": pool_name,
-                    "application": application,
-                    "data_analysis": data_analysis,
-                    "data_delivery": data_delivery,
-                    "samples": [
-                        {
-                            "application": sample["application"],
-                            "comment": sample.get("comment"),
-                            "data_delivery": sample.get("data_delivery"),
-                            "name": sample["name"],
-                            "priority": sample["priority"],
-                        }
-                        for sample in pool_samples
-                    ],
+                    "application": sample.application,
+                    "data_analysis": sample.data_analysis,
+                    "data_delivery": sample.data_delivery,
+                    "samples": [],
                 }
-            )
+
+            pools[pool_name]["samples"].append(sample.dict())
+
+        status_data: StatusData = StatusData(
+            customer=validated_form.customer,
+            order=validated_form.name,
+            comment=validated_form.comment,
+            pools=[pools[pool_name] for pool_name in pools],
+        )
+
         return status_data
 
     @staticmethod
@@ -450,57 +415,63 @@ class StatusHandler:
         return sample_objs
 
     def store_rml(
-        self, customer: str, order: str, ordered: dt.datetime, ticket: int, pools: List[dict]
+        self, customer: str, order: str, ordered: dt.datetime, ticket: int, pools: List[Pool]
     ) -> List[models.Pool]:
         """Store pools in the status database."""
-        customer_obj = self.status.customer(customer)
+        customer_obj: Optional[models.Customer] = self.status.customer(customer)
         if customer_obj is None:
             raise OrderError(f"unknown customer: {customer}")
-        new_pools = []
-        new_samples = []
+        new_pools: List[models.Pool] = []
+        new_samples: List[models.Sample] = []
+        pool: Pool
         for pool in pools:
             with self.status.session.no_autoflush:
-                application_version = self.status.current_application_version(pool["application"])
+                application_version = self.status.current_application_version(pool.application)
                 if application_version is None:
-                    raise OrderError(f"Invalid application: {pool['application']}")
+                    raise OrderError(f"Invalid application: {pool.application}")
 
-            case_name = f"{ticket}-{pool['name']}"
-            case_obj = self.status.find_family(customer=customer_obj, name=case_name)
+            case_name = f"{ticket}-{pool.name}"
+            case_obj: Optional[models.Family] = self.status.find_family(
+                customer=customer_obj, name=case_name
+            )
 
             if not case_obj:
-                case_obj = self.status.add_case(
-                    data_analysis=Pipeline(pool["data_analysis"]),
-                    data_delivery=DataDelivery(pool["data_delivery"]),
+                case_obj: models.Family = self.status.add_case(
+                    data_analysis=Pipeline(pool.data_analysis),
+                    data_delivery=DataDelivery(pool.data_delivery),
                     name=case_name,
                     panels=None,
                 )
                 case_obj.customer = customer_obj
                 self.status.add_commit(case_obj)
 
-            new_pool = self.status.add_pool(
+            new_pool: models.Pool = self.status.add_pool(
                 customer=customer_obj,
-                name=pool["name"],
+                name=pool.name,
                 order=order,
                 ordered=ordered,
                 ticket=ticket,
                 application_version=application_version,
             )
-            for sample in pool["samples"]:
-                new_sample = self.status.add_sample(
+            sample: StatusSample
+            for sample in pool.samples:
+                new_sample: models.Sample = self.status.add_sample(
                     application_version=application_version,
-                    comment=sample["comment"],
+                    comment=sample.comment,
                     customer=customer_obj,
-                    internal_id=sample.get("internal_id"),
-                    name=sample["name"],
+                    internal_id=sample.internal_id,
+                    name=sample.name,
                     order=order,
                     ordered=ordered,
-                    priority=sample["priority"],
+                    priority=sample.priority,
                     sex="unknown",
                     ticket=ticket,
                 )
                 new_samples.append(new_sample)
                 self.status.relate_sample(family=case_obj, sample=new_sample, status="unknown")
-            new_delivery = self.status.add_delivery(destination="caesar", pool=new_pool)
+            new_delivery: models.Delivery = self.status.add_delivery(
+                destination="caesar", pool=new_pool
+            )
             self.status.add(new_delivery)
             new_pools.append(new_pool)
         self.status.add_commit(new_pools)
