@@ -4,7 +4,15 @@ from typing import Dict, List, Optional
 
 from cg.constants import DataDelivery, Pipeline
 from cg.exc import OrderError
-from cg.meta.orders.rml_order_form import Pool, RMLOrderform, StatusData, StatusSample
+from cg.meta.orders.pools import get_pools
+from cg.meta.orders.rml_order_form import (
+    Orderform,
+    OrderSample,
+    Pool,
+    RMLOrderform,
+    StatusData,
+    StatusSample,
+)
 from cg.store import models
 
 
@@ -26,32 +34,16 @@ class StatusHandler:
         return cases
 
     @staticmethod
-    def pools_to_status(data: dict) -> StatusData:
+    def get_status_data(data: dict) -> Orderform:
+        return Orderform(**data)
+
+    @staticmethod
+    def pools_to_status(data: dict) -> Orderform:
         """Convert input to pools."""
+        orderform: Orderform = StatusHandler.get_status_data(data)
+        orderform.pools = get_pools(orderform)
 
-        validated_form: RMLOrderform = RMLOrderform(**data)
-        pools = {}
-        for sample in validated_form.samples:
-            pool_name: str = sample.pool
-            if pool_name not in pools:
-                pools[pool_name] = {
-                    "name": pool_name,
-                    "application": sample.application,
-                    "data_analysis": sample.data_analysis,
-                    "data_delivery": sample.data_delivery,
-                    "samples": [],
-                }
-
-            pools[pool_name]["samples"].append(sample.dict())
-
-        status_data: StatusData = StatusData(
-            customer=validated_form.customer,
-            order=validated_form.name,
-            comment=validated_form.comment,
-            pools=[pools[pool_name] for pool_name in pools],
-        )
-
-        return status_data
+        return orderform
 
     @staticmethod
     def samples_to_status(data: dict) -> dict:
@@ -149,23 +141,22 @@ class StatusHandler:
 
     @classmethod
     def get_single_value(cls, case_name, case_samples, value_key, value_default=None):
-        values = set(sample.get(value_key, value_default) for sample in case_samples)
+        values = {sample.get(value_key, value_default) for sample in case_samples}
         if len(values) > 1:
             raise ValueError(f"different sample {value_key} values: {case_name} - {values}")
-        single_value = values.pop()
-        return single_value
+        return values.pop()
 
     def store_cases(
         self, customer: str, order: str, ordered: dt.datetime, ticket: int, cases: List[dict]
     ) -> List[models.Family]:
         """Store cases and samples in the status database."""
 
-        customer_obj = self.status.customer(customer)
+        customer_obj: Optional[models.Customer] = self.status.customer(customer)
         if customer_obj is None:
             raise OrderError(f"unknown customer: {customer}")
-        new_families = []
+        new_cases: List[models.Family] = []
         for case in cases:
-            case_obj = self.status.find_family(customer_obj, case["name"])
+            case_obj: Optional[models.Family] = self.status.find_family(customer_obj, case["name"])
             if case_obj:
                 case_obj.panels = case["panels"]
             else:
@@ -177,45 +168,47 @@ class StatusHandler:
                     priority=case["priority"],
                 )
                 case_obj.customer = customer_obj
-                new_families.append(case_obj)
+                new_cases.append(case_obj)
 
             family_samples = {}
             for sample in case["samples"]:
-                sample_obj = self.status.sample(sample["internal_id"])
+                sample_obj: Optional[models.Sample] = self.status.sample(sample["internal_id"])
                 if sample_obj:
                     family_samples[sample["name"]] = sample_obj
-                else:
-                    new_sample = self.status.add_sample(
-                        capture_kit=sample["capture_kit"],
-                        cohorts=sample["cohorts"],
-                        comment=sample["comment"],
-                        from_sample=sample["from_sample"],
-                        internal_id=sample["internal_id"],
-                        name=sample["name"],
-                        order=order,
-                        ordered=ordered,
-                        phenotype_terms=sample["phenotype_terms"],
-                        priority=case["priority"],
-                        sex=sample["sex"],
-                        synopsis=sample["synopsis"],
-                        ticket=ticket,
-                        time_point=sample["time_point"],
-                        tumour=sample["tumour"],
-                    )
-                    new_sample.customer = customer_obj
-                    with self.status.session.no_autoflush:
-                        application_tag = sample["application"]
-                        new_sample.application_version = self.status.current_application_version(
-                            application_tag
-                        )
-                    if new_sample.application_version is None:
-                        raise OrderError(f"Invalid application: {sample['application']}")
+                    continue
 
-                    family_samples[new_sample.name] = new_sample
-                    self.status.add(new_sample)
-                    new_delivery = self.status.add_delivery(destination="caesar", sample=new_sample)
-                    self.status.add(new_delivery)
+                new_sample: models.Sample = self.status.add_sample(
+                    capture_kit=sample["capture_kit"],
+                    cohorts=sample["cohorts"],
+                    comment=sample["comment"],
+                    from_sample=sample["from_sample"],
+                    internal_id=sample["internal_id"],
+                    name=sample["name"],
+                    order=order,
+                    ordered=ordered,
+                    phenotype_terms=sample["phenotype_terms"],
+                    priority=case["priority"],
+                    sex=sample["sex"],
+                    synopsis=sample["synopsis"],
+                    ticket=ticket,
+                    time_point=sample["time_point"],
+                    tumour=sample["tumour"],
+                )
+                new_sample.customer = customer_obj
+                with self.status.session.no_autoflush:
+                    application_tag: str = sample["application"]
+                    new_sample.application_version: Optional[
+                        models.ApplicationVersion
+                    ] = self.status.current_application_version(application_tag)
+                if new_sample.application_version is None:
+                    raise OrderError(f"Invalid application: {sample['application']}")
 
+                family_samples[new_sample.name] = new_sample
+                self.status.add(new_sample)
+                new_delivery = self.status.add_delivery(destination="caesar", sample=new_sample)
+                self.status.add(new_delivery)
+
+            # Create links
             for sample in case["samples"]:
                 mother_obj = family_samples[sample["mother"]] if sample.get("mother") else None
                 father_obj = family_samples[sample["father"]] if sample.get("father") else None
@@ -234,21 +227,21 @@ class StatusHandler:
                         father=father_obj,
                     )
                     self.status.add(new_link)
-            self.status.add_commit(new_families)
-        return new_families
+            self.status.add_commit(new_cases)
+        return new_cases
 
     def store_samples(
         self, customer: str, order: str, ordered: dt.datetime, ticket: int, samples: List[dict]
     ) -> List[models.Sample]:
         """Store samples in the status database."""
-        customer_obj = self.status.customer(customer)
+        customer_obj: Optional[models.Customer] = self.status.customer(customer)
         if customer_obj is None:
             raise OrderError(f"unknown customer: {customer}")
-        new_samples = []
+        new_samples: List[models.Sample] = []
 
         with self.status.session.no_autoflush:
             for sample in samples:
-                new_sample = self.status.add_sample(
+                new_sample: models.Sample = self.status.add_sample(
                     comment=sample["comment"],
                     internal_id=sample["internal_id"],
                     name=sample["name"],
@@ -260,14 +253,16 @@ class StatusHandler:
                     tumour=sample["tumour"],
                 )
                 new_sample.customer = customer_obj
-                application_tag = sample["application"]
-                application_version = self.status.current_application_version(application_tag)
+                application_tag: str = sample["application"]
+                application_version: Optional[
+                    models.ApplicationVersion
+                ] = self.status.current_application_version(application_tag)
                 if application_version is None:
                     raise OrderError(f"Invalid application: {sample['application']}")
                 new_sample.application_version = application_version
                 new_samples.append(new_sample)
 
-                new_case = self.status.add_case(
+                new_case: models.Family = self.status.add_case(
                     data_analysis=Pipeline(sample["data_analysis"]),
                     data_delivery=DataDelivery(sample["data_delivery"]),
                     name=sample["name"],
@@ -289,11 +284,11 @@ class StatusHandler:
         self, customer: str, order: str, ordered: dt.datetime, ticket: int, samples: List[dict]
     ) -> List[models.Sample]:
         """Store fastq samples in the status database including family connection and delivery"""
-        production_customer = self.status.customer("cust000")
-        customer_obj = self.status.customer(customer)
+        production_customer: models.Customer = self.status.customer("cust000")
+        customer_obj: Optional[models.Customer] = self.status.customer(customer)
         if customer_obj is None:
             raise OrderError(f"unknown customer: {customer}")
-        new_samples = []
+        new_samples: List[models.Sample] = []
 
         with self.status.session.no_autoflush:
             for sample in samples:
@@ -309,8 +304,10 @@ class StatusHandler:
                     tumour=sample["tumour"],
                 )
                 new_sample.customer = customer_obj
-                application_tag = sample["application"]
-                application_version = self.status.current_application_version(application_tag)
+                application_tag: str = sample["application"]
+                application_version: Optional[
+                    models.ApplicationVersion
+                ] = self.status.current_application_version(application_tag)
                 if application_version is None:
                     raise OrderError(f"Invalid application: {sample['application']}")
                 new_sample.application_version = application_version
@@ -328,7 +325,9 @@ class StatusHandler:
                     family=new_case, sample=new_sample, status=sample["status"] or "unknown"
                 )
                 self.status.add(new_relationship)
-                new_delivery = self.status.add_delivery(destination="caesar", sample=new_sample)
+                new_delivery: models.Delivery = self.status.add_delivery(
+                    destination="caesar", sample=new_sample
+                )
                 self.status.add(new_delivery)
 
         self.status.add_commit(new_samples)

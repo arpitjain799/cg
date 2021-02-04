@@ -19,7 +19,7 @@ from cg.exc import OrderError, TicketCreationError
 from cg.store import Store, models
 
 from .lims import LimsHandler
-from .rml_order_form import StatusData
+from .rml_order_form import Orderform, StatusData
 from .schema import ORDER_SCHEMES, OrderType
 from .status import StatusHandler
 
@@ -176,7 +176,7 @@ class OrdersAPI(LimsHandler, StatusHandler):
 
     def _submit_rml(self, order: dict) -> dict:
         """Submit a batch of ready made libraries."""
-        status_data: StatusData = self.pools_to_status(order)
+        status_data: Orderform = self.pools_to_status(order)
         project_data, lims_map = self.process_lims(order, order["samples"])
         samples = [sample.dict() for pool in status_data.pools for sample in pool.samples]
         self._fill_in_sample_ids(samples, lims_map, id_key="internal_id")
@@ -340,16 +340,16 @@ class OrdersAPI(LimsHandler, StatusHandler):
             LOG.debug(f"{sample['name']}: link sample to LIMS")
             if sample.get(id_key):
                 continue
-            internal_id = lims_map[sample["name"]]
-            LOG.info(f"{sample['name']} -> {internal_id}: connect sample to LIMS")
+            internal_id: str = lims_map[sample["name"]]
+            LOG.info("%s -> %s: connect sample to LIMS", sample["name"], internal_id)
             sample[id_key] = internal_id
 
     def _fill_in_sample_verified_organism(self, samples: List[dict]):
         for sample in samples:
-            organism_id = sample["organism"]
-            reference_genome = sample["reference_genome"]
-            organism = self.status.organism(internal_id=organism_id)
-            is_verified = (
+            organism_id: str = sample["organism"]
+            reference_genome: str = sample["reference_genome"]
+            organism: models.Organism = self.status.organism(internal_id=organism_id)
+            is_verified: bool = (
                 organism and organism.reference_genome == reference_genome and organism.verified
             )
             sample["verified_organism"] = is_verified
