@@ -53,7 +53,7 @@ class OrdersAPI(LimsHandler, StatusHandler):
 
         if ticket_match:
             ticket_number = int(ticket_match.group(1))
-            LOG.info(f"{ticket_number}: detected ticket in order name")
+            LOG.info("%s: detected ticket in order name", ticket_number)
             order["ticket"] = ticket_number
         else:
             # open and assign ticket to order
