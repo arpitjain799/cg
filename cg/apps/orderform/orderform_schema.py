@@ -1,7 +1,6 @@
 from enum import Enum
-from typing import List, Literal, Optional
+from typing import List, Optional
 
-from cg.constants import SEX_OPTIONS
 from pydantic import BaseModel, constr
 
 
@@ -49,7 +48,7 @@ class OrderSample(BaseModel):
     container: ContainerEnum = ContainerEnum.other
     container_name: Optional[str]
     data_analysis: str
-    data_delivery: Optional[str]
+    data_delivery: str
     elution_buffer: Optional[str]
     extraction_method: Optional[str]
     family_name: Optional[str]
@@ -142,7 +141,7 @@ class MetagenomeSample(OrderSample):
 
 
 # This is for validating indata
-class Orderform(BaseModel):
+class OrderformSchema(BaseModel):
     comment: str
     customer: str
     name: str
@@ -150,36 +149,5 @@ class Orderform(BaseModel):
     samples: List[OrderSample]
 
 
-class MipOrderform(Orderform):
+class MipOrderform(OrderformSchema):
     samples: List[MipSample]
-
-
-class StatusSample(BaseModel):
-    application: str
-    comment: Optional[str] = None
-    data_delivery: Optional[str] = None
-    name: str
-    priority: str
-    internal_id: Optional[str] = None
-    sex: Optional[str] = None
-    status: Optional[str]
-    tumour: bool = False
-
-
-class Pool(BaseModel):
-    name: str
-    application: str
-    data_analysis: str
-    data_delivery: str
-
-
-# This is for specifying outdata
-class StatusData(BaseModel):
-    customer: str
-    order: str
-    comment: str
-    ticket: Optional[str] = None
-    pools: List[Pool] = None
-    samples: List[StatusSample]
-    data_analysis: str
-    data_delivery: str

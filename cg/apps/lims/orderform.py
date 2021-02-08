@@ -3,12 +3,11 @@ from pathlib import Path
 from typing import Dict, List, Set
 
 import openpyxl
-from openpyxl.workbook import Workbook
-from openpyxl.worksheet.worksheet import Worksheet
-
-from cg.constants import ANALYSIS_SOURCES, METAGENOME_SOURCES, Pipeline, DataDelivery
+from cg.constants import ANALYSIS_SOURCES, METAGENOME_SOURCES, DataDelivery, Pipeline
 from cg.exc import OrderFormError
 from cg.meta.orders import OrderType
+from openpyxl.workbook import Workbook
+from openpyxl.worksheet.worksheet import Worksheet
 
 SEX_MAP = {"male": "M", "female": "F", "unknown": "unknown"}
 REV_SEX_MAP = {value: key for key, value in SEX_MAP.items()}
@@ -24,12 +23,24 @@ VALID_ORDERFORMS = [
 NO_VALUE = "no_value"
 NO_ANALYSIS = "no-analysis"
 
+# Project types that are grouped on cases
 CASE_PROJECT_TYPES = [
     str(OrderType.MIP_DNA),
     str(OrderType.EXTERNAL),
     str(OrderType.BALSAMIC),
     str(OrderType.MIP_RNA),
 ]
+
+
+class Orderform:
+    """Class to handle order forms"""
+
+    def __init__(self, orderform_file: str):
+        self.orderform_file: Path = Path(orderform_file)
+        if self.orderform_file.suffix == ".xlsx":
+            self.orderform_parser = ExcelOrderformParser()
+        else:
+            self.orderform_parser = JsonOrderformParser()
 
 
 def check_orderform_version(document_title: str) -> None:
@@ -40,19 +51,23 @@ def check_orderform_version(document_title: str) -> None:
     raise OrderFormError(f"Unsupported orderform: {document_title}")
 
 
+def get_sheet_name(sheet_names: List[str]) -> str:
+    """Return the correct (exitsing) sheet names"""
+    sheet_name_alternatives: List[str] = ["Orderform", "orderform", "order form"]
+
+    for name in sheet_name_alternatives:
+        if name not in sheet_names:
+            continue
+        return name
+    raise OrderFormError("'orderform' sheet not found in Excel file")
+
+
 def parse_orderform(excel_path: str) -> dict:
     """Parse out information from an order form."""
 
     workbook: Workbook = openpyxl.load_workbook(filename=excel_path, read_only=True, data_only=True)
 
-    sheet_name = None
-    sheet_names: List[str] = workbook.sheetnames
-    for name in ["Orderform", "orderform", "order form"]:
-        if name in sheet_names:
-            sheet_name = name
-            break
-    if sheet_name is None:
-        raise OrderFormError("'orderform' sheet not found in Excel file")
+    sheet_name: str = get_sheet_name(workbook.sheetnames)
 
     orderform_sheet: Worksheet = workbook[sheet_name]
     document_title: str = get_document_title(workbook, orderform_sheet)

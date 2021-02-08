@@ -1,5 +1,4 @@
 """Constants for cg"""
-from enum import Enum
 
 from cg.utils.StrEnum import StrEnum
 

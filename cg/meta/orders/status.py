@@ -5,14 +5,7 @@ from typing import Dict, List, Optional
 from cg.constants import DataDelivery, Pipeline
 from cg.exc import OrderError
 from cg.meta.orders.pools import get_pools
-from cg.meta.orders.rml_order_form import (
-    Orderform,
-    OrderSample,
-    Pool,
-    RMLOrderform,
-    StatusData,
-    StatusSample,
-)
+from cg.meta.orders.rml_order_form import Orderform, OrderSample, Pool, StatusData, StatusSample
 from cg.store import models
 
 
@@ -23,11 +16,11 @@ class StatusHandler:
         self.status = None
 
     @staticmethod
-    def group_cases(samples: List[dict]) -> dict:
+    def group_cases(samples: List[OrderSample]) -> Dict[str, List[OrderSample]]:
         """Group samples in cases."""
         cases = {}
         for sample in samples:
-            case_id = sample["family_name"]
+            case_id = sample.family_name
             if case_id not in cases:
                 cases[case_id] = []
             cases[case_id].append(sample)
