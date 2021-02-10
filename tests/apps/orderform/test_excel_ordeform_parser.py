@@ -1,11 +1,10 @@
-import logging
 from pathlib import Path
 from typing import Optional
 
 from cg.apps.orderform.excel_orderform_parser import ExcelOrderformParser
 from cg.apps.orderform.schemas.excel_sample_schema import ExcelSample
 from cg.apps.orderform.schemas.orderform_schema import OrderformSchema
-from cg.constants import DataDelivery, Pipeline
+from cg.constants import Pipeline
 
 
 def get_sample_obj(
@@ -14,7 +13,6 @@ def get_sample_obj(
     for sample_obj in order_form_parser.samples:
         if sample_obj.name == sample_id:
             return sample_obj
-    return None
 
 
 def test_parse_rml_orderform(rml_orderform: str, nr_samples_rml_orderform: int):
@@ -75,44 +73,6 @@ def test_fastq_samples_is_correct(fastq_order_parser: ExcelOrderformParser):
 
     # THEN assert that they where both parsed
     assert tumour_sample and normal_sample
-
-
-def test_rml_sample_is_correct(rml_order_parser: ExcelOrderformParser):
-    """Test that one of the rml samples is on the correct format"""
-    # GIVEN a orderform parser with a parsed order form
-    # GIVEN a sample with known values
-    sample_id = "sample1"
-    sample_obj: Optional[ExcelSample] = None
-    for sample in rml_order_parser.samples:
-        if sample_obj:
-            break
-        if sample.name == sample_id:
-            sample_obj = sample
-    # GIVEN that the sample exists
-    assert sample_obj
-
-    # WHEN fetching the sample
-
-    # THEN assert that all the known values are correct
-    assert sample_obj.pool == "pool1"
-    assert sample_obj.application == "RMLP10R300"
-    assert sample_obj.data_analysis == str(Pipeline.FLUFFY)
-    assert sample_obj.volume == "1"
-    assert sample_obj.concentration == "2"
-    assert sample_obj.index == "IDT DupSeq 10 bp Set B"
-    assert sample_obj.index_number == "1"
-
-    assert sample_obj.container_name is None
-    assert sample_obj.rml_plate_name == "plate"
-    assert sample_obj.well_position is None
-    assert sample_obj.well_position_rml == "A:1"
-
-    assert sample_obj.reagent_label == "A01 IDT_10nt_541 (ATTCCACACT-AACAAGACCA)"
-
-    assert sample_obj.custom_index == "GATACA"
-
-    assert sample_obj.comment == "comment"
-    assert sample_obj.concentration_sample == "3"
 
 
 def test_generate_parsed_rml_orderform(rml_order_parser: ExcelOrderformParser, caplog):

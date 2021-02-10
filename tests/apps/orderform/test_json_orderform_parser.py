@@ -8,7 +8,7 @@ def test_parse_rml_orderform(rml_order_to_submit: dict):
     order_form_parser = JsonOrderformParser()
 
     # WHEN parsing the RML orderform
-    order: OrderformSchema = order_form_parser.parse_orderform(order_data=rml_order_to_submit)
+    order_form_parser.parse_orderform(order_data=rml_order_to_submit)
 
     # THEN assert that the orderform was parsed in the correct way
-    assert isinstance(order, OrderformSchema)
+    assert order_form_parser.order_name == rml_order_to_submit.get("name")

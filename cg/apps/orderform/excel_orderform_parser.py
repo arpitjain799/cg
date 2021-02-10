@@ -96,7 +96,6 @@ class ExcelOrderformParser(OrderformParser):
 
                     sample_dict = dict(zip(header_row, values))
                     sample_dict.pop(None)
-                    print(sample_dict)
                     raw_samples.append(sample_dict)
                 else:
                     empty_row_found = True

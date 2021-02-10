@@ -1,6 +1,6 @@
 import pytest
 from cg.apps.orderform.schemas.excel_sample_schema import ExcelSample
-from cg.constants import DataDelivery
+from cg.constants import DataDelivery, Pipeline
 from pydantic import ValidationError
 
 
@@ -70,15 +70,34 @@ def test_excel_with_panels(minimal_excel_sample: dict):
     assert set(excel_sample.panels) == set([panel_1, panel_2])
 
 
-def test_excel_sample_schema_simple_rml(rml_excel_sample: dict):
-    """Test a basic rml sample"""
-    # GIVEN some simple sample info from a RML sample
+def test_rml_sample_is_correct(rml_excel_sample: dict):
+    """Test that one of the rml samples is on the correct format"""
+    # GIVEN a orderform parser with a parsed order form
+    # GIVEN a sample with known values
+    sample_obj: ExcelSample = ExcelSample(**rml_excel_sample)
 
-    # WHEN creating a excel sample
-    excel_sample: ExcelSample = ExcelSample(**rml_excel_sample)
+    # WHEN fetching the sample
 
-    # THEN assert that the sample priority info was correctly parsed
-    assert excel_sample.priority == rml_excel_sample["UDF/priority"]
+    # THEN assert that all the known values are correct
+    assert sample_obj.pool == "pool1"
+    assert sample_obj.application == "RMLP10R300"
+    assert sample_obj.data_analysis == str(Pipeline.FLUFFY)
+    assert sample_obj.volume == "1"
+    assert sample_obj.concentration == "2"
+    assert sample_obj.index == "IDT DupSeq 10 bp Set B"
+    assert sample_obj.index_number == "1"
+
+    assert sample_obj.container_name is None
+    assert sample_obj.rml_plate_name == "plate"
+    assert sample_obj.well_position is None
+    assert sample_obj.well_position_rml == "A:1"
+
+    assert sample_obj.reagent_label == "A01 IDT_10nt_541 (ATTCCACACT-AACAAGACCA)"
+
+    assert sample_obj.custom_index == "GATACA"
+
+    assert sample_obj.comment == "comment"
+    assert sample_obj.concentration_sample == "3"
 
 
 def test_tumor_sample_schema(tumor_fastq_sample: dict):
