@@ -53,6 +53,8 @@ class ExcelSample(OrderSample):
     def validate_pipeline(cls, value):
         if not value:
             return None
+        if value.lower() == "no analysis":
+            return value
         return value.lower()
 
     @validator(
@@ -84,10 +86,6 @@ class ExcelSample(OrderSample):
             return None
         value = value.strip()
         return REV_SEX_MAP.get(value, "unknown")
-
-    @validator("require_qcok", "tumour")
-    def check_yes(cls, value):
-        return bool(value and value == "yes")
 
     @validator("panels", pre=True)
     def parse_panels(cls, value):

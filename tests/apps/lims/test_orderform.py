@@ -1,40 +1,5 @@
 from cg.apps.lims import orderform
-from cg.constants import Pipeline, DataDelivery
-
-
-def test_parsing_rml_orderform(rml_orderform: str):
-    # GIVEN a path to a RML orderform with 2 sample in a pool
-    # WHEN parsing the file
-    data = orderform.parse_orderform(rml_orderform)
-
-    # THEN it should determine the type of project and customer
-    assert data["project_type"] == "rml"
-    assert data["customer"] == "cust000"
-    # ... and find all samples
-    assert len(data["items"]) == 26
-
-    # ... and collect relevant sample data
-    sample_data = data["items"][0]
-    assert sample_data["name"] == "sample1"
-    assert sample_data["pool"] == "pool1"
-    assert sample_data["application"] == "RMLP10R300"
-    assert sample_data["data_analysis"].lower() == str(Pipeline.FLUFFY)
-    assert sample_data["volume"] == "1"
-    assert sample_data["concentration"] == "2"
-    assert sample_data["index"] == "IDT DupSeq 10 bp Set B"
-    assert sample_data["index_number"] == "1"
-
-    assert sample_data["container_name"] is None
-    assert sample_data["rml_plate_name"] == "plate"
-    assert sample_data["well_position"] is None
-    assert sample_data["well_position_rml"] == "A:1"
-
-    assert sample_data["reagent_label"] == "A01 IDT_10nt_541 (ATTCCACACT-AACAAGACCA)"
-
-    assert sample_data["custom_index"] == "GATACA"
-
-    assert sample_data["comment"] == "comment"
-    assert sample_data["concentration_sample"] == "3"
+from cg.constants import DataDelivery, Pipeline
 
 
 def test_parsing_fastq_orderform(fastq_orderform):

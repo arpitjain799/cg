@@ -1,5 +1,6 @@
 import pytest
 from cg.apps.orderform.schemas.excel_sample_schema import ExcelSample
+from cg.constants import DataDelivery
 from pydantic import ValidationError
 
 
@@ -78,3 +79,40 @@ def test_excel_sample_schema_simple_rml(rml_excel_sample: dict):
 
     # THEN assert that the sample priority info was correctly parsed
     assert excel_sample.priority == rml_excel_sample["UDF/priority"]
+
+
+def test_tumor_sample_schema(tumor_fastq_sample: dict):
+    """Test to validate a tumor fastq sample"""
+    # GIVEN some simple sample info from a fastq tumor sample
+
+    # WHEN creating a excel sample
+    excel_sample: ExcelSample = ExcelSample(**tumor_fastq_sample)
+
+    # THEN assert that sample information was correctly parsed
+    assert excel_sample.tumour is True
+    assert excel_sample.source == "tissue (FFPE)"
+    assert excel_sample.quantity == "4"
+    assert excel_sample.comment == "other Elution buffer"
+    assert excel_sample.tumour is True
+
+
+def test_normal_sample_schema(normal_fastq_sample: dict):
+    """Test to validate a normal fastq sample"""
+    # GIVEN some simple sample info from a fastq normal sample
+
+    # WHEN creating a excel sample
+    excel_sample: ExcelSample = ExcelSample(**normal_fastq_sample)
+
+    # THEN assert that the sample information was correctly parsed
+    assert excel_sample.container == "Tube"
+    assert excel_sample.data_analysis == "No analysis"
+    assert excel_sample.data_delivery == str(DataDelivery.FASTQ)
+    assert excel_sample.application == "WGTPCFC030"
+    assert excel_sample.sex == "female"
+    assert excel_sample.case_id == "c1"
+    assert excel_sample.require_qcok is False
+    assert excel_sample.source == "bone marrow"
+    assert excel_sample.priority == "research"
+    assert excel_sample.container_name == ""
+    assert excel_sample.well_position == ""
+    assert excel_sample.tumour is False
