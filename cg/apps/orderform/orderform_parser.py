@@ -45,7 +45,7 @@ class OrderformParser:
             raise OrderFormError(f"multiple values for 'Priority' for case: {case_id}")
 
         gene_panels = set()
-        for sample in self.samples:
+        for sample in case_samples:
             if not sample.panels:
                 continue
             gene_panels.update(set(sample.panels))

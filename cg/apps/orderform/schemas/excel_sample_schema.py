@@ -16,7 +16,7 @@ class ExcelSample(OrderSample):
     container_name: str = Field(None, alias="Container/Name")
     custom_index: str = Field(None, alias="UDF/Custom index")
     customer: str = Field(..., alias="UDF/customer")
-    data_analysis: str = Field(..., alias="UDF/Data Analysis")
+    data_analysis: str = Field("MIP DNA", alias="UDF/Data Analysis")
     data_delivery: str = Field(None, alias="UDF/Data Delivery")
     elution_buffer: str = Field(None, alias="UDF/Sample Buffer")
     extraction_method: str = Field(None, alias="UDF/Extraction method")
@@ -50,12 +50,20 @@ class ExcelSample(OrderSample):
     well_position_rml: str = Field(None, alias="UDF/RML well position")
 
     @validator("data_analysis")
-    def validate_pipeline(cls, value):
-        if not value:
-            return None
-        if value.lower() == "no analysis":
-            return value
-        return value.lower()
+    def validate_data_analysis(cls, value):
+
+        data_analysis_alternatives = [
+            "MIP DNA",
+            "MIP RNA",
+            "FLUFFY",
+            "Balsamic",
+            "fastq",
+            "custom",
+            "No analysis",
+        ]
+        if value not in data_analysis_alternatives:
+            raise AttributeError(f"{value} is not a valid data analysis")
+        return value
 
     @validator(
         "index_number", "volume", "quantity", "concentration", "concentration_sample", "time_point"
@@ -96,7 +104,7 @@ class ExcelSample(OrderSample):
             separator = ":"
         return value.split(separator)
 
-    @validator("priority", "status")
+    @validator("priority", "status", "data_delivery")
     def convert_to_lower(cls, value: Optional[str]):
         if not value:
             return None

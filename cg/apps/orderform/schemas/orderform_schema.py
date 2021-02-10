@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import List, Optional
 
+from cg.constants import DataDelivery, Pipeline
 from pydantic import BaseModel, constr
 
 
@@ -43,6 +44,7 @@ class OrderSample(BaseModel):
     application: str
     capture_kit: Optional[str]
     case_id: str
+    cohorts: List[str] = None
     comment: Optional[str]
     concentration: int
     concentration_sample: int
@@ -50,8 +52,8 @@ class OrderSample(BaseModel):
     container_name: Optional[str]
     customer: Optional[str]
     custom_index: Optional[str]
-    data_analysis: str
-    data_delivery: str
+    data_analysis: Pipeline
+    data_delivery: DataDelivery
     elution_buffer: Optional[str]
     extraction_method: Optional[str]
     family_name: Optional[str]

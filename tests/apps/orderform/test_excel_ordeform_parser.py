@@ -15,6 +15,43 @@ def get_sample_obj(
             return sample_obj
 
 
+def test_generate_orderform_with_cases(mip_order_parser: ExcelOrderformParser):
+    """Test to parse a mip orderform with cases"""
+    # GIVEN a mip orderform parser
+
+    # WHEN generating a orderform
+    orderform: OrderformSchema = mip_order_parser.generate_orderform()
+
+    # THEN assert that there where cases in the order
+    assert len(orderform.cases) > 0
+
+    case_obj = orderform.cases[0]
+    assert len(case_obj.samples) == 3
+    assert case_obj.name == "c1"
+    assert case_obj.priority == "research"
+    assert set(case_obj.panels) == set(["AD-HSP", "Ataxi", "ATX"])
+    assert case_obj.require_qcok is True
+
+
+def test_parse_mip_orderform(mip_orderform: str, nr_samples_mip_orderform: int):
+    """Test to parse a mip orderform in xlsx format"""
+    # GIVEN a orderform in excel format
+    assert Path(mip_orderform).suffix == ".xlsx"
+    # GIVEN a orderform API
+    order_form_parser = ExcelOrderformParser()
+    # GIVEN the correct orderform name
+    order_name: str = Path(mip_orderform).stem
+
+    # WHEN parsing the mip orderform
+    order_form_parser.parse_orderform(excel_path=mip_orderform)
+
+    # THEN assert the number of samples parsed are correct
+    assert len(order_form_parser.samples) == nr_samples_mip_orderform
+
+    # THEN assert that the project type is correct
+    assert order_form_parser.project_type == str(Pipeline.MIP_DNA)
+
+
 def test_parse_rml_orderform(rml_orderform: str, nr_samples_rml_orderform: int):
     """Test to parse an excel orderform in xlsx format"""
     # GIVEN a orderform in excel format

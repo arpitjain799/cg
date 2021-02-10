@@ -1,6 +1,6 @@
 import pytest
 from cg.apps.orderform.schemas.excel_sample_schema import ExcelSample
-from cg.constants import DataDelivery, Pipeline
+from cg.constants import DataDelivery
 from pydantic import ValidationError
 
 
@@ -70,9 +70,31 @@ def test_excel_with_panels(minimal_excel_sample: dict):
     assert set(excel_sample.panels) == set([panel_1, panel_2])
 
 
+def test_mip_sample_is_correct(mip_orderform_sample: dict):
+    """Tests that a mip sample is parsed correct"""
+    # GIVEN sample data about a known sample
+
+    # WHEN parsing the sample
+    proband_sample: ExcelSample = ExcelSample(**mip_orderform_sample)
+    assert proband_sample.name == "s1"
+    assert proband_sample.container == "96 well plate"
+    assert proband_sample.data_analysis == "MIP DNA"
+    assert proband_sample.data_delivery == str(DataDelivery.SCOUT)
+    assert proband_sample.application == "PANKTTR010"
+    assert proband_sample.sex == "male"
+    assert proband_sample.source == "tissue (FFPE)"
+    assert proband_sample.tumour is True
+    assert proband_sample.container_name == "plate1"
+    assert proband_sample.well_position == "A:1"
+    assert proband_sample.status == "affected"
+    assert proband_sample.mother == "s2"
+    assert proband_sample.father == "s3"
+    assert proband_sample.quantity == "4"
+    assert proband_sample.comment == "other Elution buffer"
+
+
 def test_rml_sample_is_correct(rml_excel_sample: dict):
     """Test that one of the rml samples is on the correct format"""
-    # GIVEN a orderform parser with a parsed order form
     # GIVEN a sample with known values
     sample_obj: ExcelSample = ExcelSample(**rml_excel_sample)
 
@@ -81,7 +103,7 @@ def test_rml_sample_is_correct(rml_excel_sample: dict):
     # THEN assert that all the known values are correct
     assert sample_obj.pool == "pool1"
     assert sample_obj.application == "RMLP10R300"
-    assert sample_obj.data_analysis == str(Pipeline.FLUFFY)
+    assert sample_obj.data_analysis == "FLUFFY"
     assert sample_obj.volume == "1"
     assert sample_obj.concentration == "2"
     assert sample_obj.index == "IDT DupSeq 10 bp Set B"
@@ -125,7 +147,7 @@ def test_normal_sample_schema(normal_fastq_sample: dict):
     # THEN assert that the sample information was correctly parsed
     assert excel_sample.container == "Tube"
     assert excel_sample.data_analysis == "No analysis"
-    assert excel_sample.data_delivery == str(DataDelivery.FASTQ)
+    assert excel_sample.data_delivery == "fastq"
     assert excel_sample.application == "WGTPCFC030"
     assert excel_sample.sex == "female"
     assert excel_sample.case_id == "c1"
