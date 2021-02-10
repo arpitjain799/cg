@@ -36,17 +36,20 @@ STATUS_OPTIONS = ()
 
 NAME_PATTERN = r"^[A-Za-z0-9-]*$"
 
+
 # Validating orderform
 class OrderSample(BaseModel):
     age_at_sampling: Optional[str]
     application: str
     capture_kit: Optional[str]
-    panels: List[str] = None
+    case_id: str
     comment: Optional[str]
     concentration: int
     concentration_sample: int
     container: ContainerEnum = ContainerEnum.other
     container_name: Optional[str]
+    customer: Optional[str]
+    custom_index: Optional[str]
     data_analysis: str
     data_delivery: str
     elution_buffer: Optional[str]
@@ -57,7 +60,7 @@ class OrderSample(BaseModel):
     from_sample: Optional[str]
     index: str
     index_number: Optional[int]
-    index_sequence: str
+    index_sequence: Optional[str]
     mother: Optional[str]
     name: constr(regex=NAME_PATTERN)
     organism: Optional[str]
@@ -65,12 +68,13 @@ class OrderSample(BaseModel):
     panels: List[str] = None
     phenotype_terms: List[str] = None
     pool: str
-    priority: PriorityEnum = PriorityEnum.standard
     post_formalin_fixation_time: Optional[int]
+    priority: PriorityEnum = PriorityEnum.standard
     quantity: Optional[int]
+    reagent_label: Optional[str]
     reference_genome: Optional[str]
     require_qcok: bool = False
-    sample_id: Optional[str]
+    rml_plate_name: Optional[str]
     sex: SexEnum = SexEnum.other
     source: Optional[str]
     status: StatusEnum = StatusEnum.unknown
@@ -81,6 +85,16 @@ class OrderSample(BaseModel):
     tumour_purity: Optional[int]
     volume: Optional[int]
     well_position: Optional[str]
+    well_position_rml: Optional[str]
+
+
+# Class for holding information about cases in order
+class OrderCase(BaseModel):
+    name: str
+    samples: List[OrderSample]
+    require_qcok: bool = False
+    priority: str
+    panels: List[str] = None
 
 
 class MipSample(OrderSample):
@@ -142,11 +156,13 @@ class MetagenomeSample(OrderSample):
 
 # This is for validating indata
 class OrderformSchema(BaseModel):
-    comment: str
+    comment: Optional[str]
+    delivery_type: str
+    project_type: str
     customer: str
     name: str
-    order: Optional[str]
     samples: List[OrderSample]
+    cases: List[OrderCase] = None
 
 
 class MipOrderform(OrderformSchema):

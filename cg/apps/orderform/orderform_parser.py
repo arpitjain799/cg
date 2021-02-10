@@ -1,173 +1,81 @@
+import logging
 from pathlib import Path
-from typing import Dict, List, Set
+from typing import Dict, List, Optional
 
-from cg.apps.lims.orderform import CASE_PROJECT_TYPES
-from cg.apps.orderform.orderform_schema import OrderformSchema, OrderSample
-from cg.constants import DataDelivery, Pipeline
+from cg.apps.orderform.schemas.orderform_schema import OrderCase, OrderformSchema, OrderSample
 from cg.exc import OrderFormError
-from cg.meta.orders import OrderType
-from cg.meta.orders.status import StatusHandler
+
+LOG = logging.getLogger(__name__)
 
 
 class OrderformParser:
     """Class to parse orderforms"""
 
-    ACCEPTED_DATA_ANALYSES: List[str] = [
-        str(Pipeline.MIP_DNA),
-        str(Pipeline.FLUFFY),
-        str(Pipeline.BALSAMIC),
-    ]
-    NO_VALUE = "no_value"
-
     def __init__(self):
-        pass
+        self.samples: List[OrderSample] = []
+        self.project_type: Optional[str] = None
+        self.delivery_type: Optional[str] = None
+        self.customer_id: Optional[str] = None
+        self.order_comment: Optional[str] = None
+        self.order_name: Optional[str] = None
 
-    def parse_orderform(self, orderform_file: Path) -> OrderformSchema:
+    def parse_orderform(self, orderform_file: Path) -> None:
+        """Parse the orderform information"""
         raise NotImplementedError
 
-    @staticmethod
-    def group_cases(samples: List[OrderSample]) -> Dict[str, List[OrderSample]]:
+    def group_cases(self) -> Dict[str, List[OrderSample]]:
         """Group samples in cases."""
+        LOG.info("Group samples under respective case")
         cases = {}
-        for sample in samples:
-            case_id = sample.family_name
+        for sample in self.samples:
+            case_id = sample.case_id
+            if not case_id:
+                continue
             if case_id not in cases:
                 cases[case_id] = []
             cases[case_id].append(sample)
+        LOG.info("Found cases %s", cases.keys())
         return cases
 
-    def get_project_type(self, samples: List[OrderSample]) -> str:
-        """Determine the project type."""
+    def expand_case(self, case_id: str, case_samples: List[OrderSample]) -> OrderCase:
+        """Fill-in information about case."""
 
-        data_analyses: Set[str] = {sample.data_analysis for sample in samples}
-
-        if len(data_analyses) > 1:
-            raise OrderFormError(f"mixed 'Data Analysis' types: {', '.join(data_analyses)}")
-
-        data_analysis: str = samples[0].data_analysis
-        if data_analysis in self.ACCEPTED_DATA_ANALYSES:
-            return data_analysis
-
-        raise OrderFormError(f"Unsupported order_data orderform: {data_analysis}")
-
-
-class JsonOrderformParser(OrderformParser):
-    ACCEPTED_DATA_ANALYSES: List[str] = [
-        str(Pipeline.MIP_DNA),
-        str(Pipeline.FLUFFY),
-        str(Pipeline.BALSAMIC),
-    ]
-    NO_VALUE = "no_value"
-
-    @staticmethod
-    def project_type_to_order_type(project_type: OrderType) -> str:
-        """In the case where data delivery was not defined we map from project type"""
-        project_to_order = {
-            OrderType.METAGENOME: DataDelivery.FASTQ,
-            OrderType.FASTQ: DataDelivery.FASTQ,
-            OrderType.RML: DataDelivery.FASTQ,
-            OrderType.MIP_RNA: DataDelivery.ANALYSIS_FILES,
-            OrderType.FLUFFY: DataDelivery.NIPT_VIEWER,
-        }
-        if project_type not in project_to_order:
-            raise OrderFormError(f"Could not find data delivery for: {project_type}")
-        return project_to_order[project_type]
-
-    def get_data_delivery(self, samples: List[OrderSample], project_type: OrderType) -> str:
-        """Determine the order_data delivery type."""
-
-        data_deliveries = {sample.data_delivery for sample in samples}
-
-        if len(data_deliveries) > 1:
-            raise OrderFormError(f"mixed 'Data Delivery' types: {', '.join(data_deliveries)}")
-
-        data_delivery = samples[0].data_delivery
-
-        if data_delivery == self.NO_VALUE:
-            return str(self.project_type_to_order_type(project_type))
-
-        try:
-            return str(DataDelivery(data_delivery))
-        except ValueError:
-            raise OrderFormError(f"Unsupported order_data delivery: {data_delivery}")
-
-    @staticmethod
-    def expand_case(case_id: str, parsed_case: dict) -> dict:
-        """Fill-in information about families."""
-        new_case = {"name": case_id, "samples": []}
-        samples = parsed_case
-
-        # Loop over all samples and check if any of them have require qcok: True
-        require_qcoks = set(raw_sample["require_qcok"] for raw_sample in samples)
-        new_case["require_qcok"] = True in require_qcoks
-
-        # Loop over all samples of a case and check if they have the same priority
-        priorities = set(raw_sample["priority"].lower() for raw_sample in samples)
+        priorities = {sample.priority for sample in case_samples if sample.priority}
         if len(priorities) != 1:
             raise OrderFormError(f"multiple values for 'Priority' for case: {case_id}")
-        new_case["priority"] = priorities.pop()
 
         gene_panels = set()
-        # add all panels found from all individuals in case
-        for raw_sample in samples:
-            if raw_sample.get("panels"):
-                gene_panels.update(raw_sample["panels"])
+        for sample in self.samples:
+            if not sample.panels:
+                continue
+            gene_panels.update(set(sample.panels))
 
-            new_sample = {}
-
-            # Add random keys? There is no controll over what is added here
-            for key, value in raw_sample.items():
-                if key not in ["panels", "well_position"]:
-                    new_sample[key] = value
-
-            # Add the well position
-            well_position_raw = raw_sample.get("well_position")
-            if well_position_raw:
-                new_sample["well_position"] = (
-                    ":".join(well_position_raw)
-                    if ":" not in well_position_raw
-                    else well_position_raw
-                )
-
-            new_case["samples"].append(new_sample)
-
-        # Add panels to case
-        if gene_panels:
-            new_case["panels"] = list(gene_panels)
-
-        return new_case
-
-    def parse_orderform(self, order_data: dict) -> OrderformSchema:
-        """Parse order form in JSON format."""
-
-        orderform: OrderformSchema = OrderformSchema(**order_data)
-        return orderform
-
-        project_type = self.get_project_type(orderform.samples)
-        data_delivery = self.get_data_delivery(
-            samples=orderform.samples, project_type=OrderType(project_type)
+        return OrderCase(
+            name=case_id,
+            samples=case_samples,
+            require_qcok=any(sample.require_qcok for sample in case_samples),
+            priority=priorities.pop(),
+            panels=list(gene_panels),
         )
-        customer_id = order_data["customer"].lower()
-        comment = order_data.get("comment")
-        order_name = order_data.get("name")
 
-        if project_type in CASE_PROJECT_TYPES:
-            # Group the samples under there case
-            parsed_cases = StatusHandler.group_cases(orderform.samples)
-            items = []
-            for case_id, parsed_case in parsed_cases.items():
-                case_data = self.expand_case(case_id, parsed_case)
-                items.append(case_data)
-        else:
-            items = orderform.samples
+    def generate_orderform(self) -> OrderformSchema:
+        """Generate an orderform"""
+        cases_map: Dict[str, List[OrderSample]] = self.group_cases()
+        case_objs: List[OrderCase] = []
+        for case_id in cases_map:
+            case_objs.append(self.expand_case(case_id=case_id, case_samples=cases_map[case_id]))
+        return OrderformSchema(
+            comment=self.order_comment,
+            samples=self.samples,
+            cases=case_objs,
+            name=self.order_name,
+            customer=self.customer_id,
+            delivery_type=self.delivery_type,
+            project_type=self.project_type,
+        )
 
-        parsed_order = {
-            "comment": comment,
-            "customer": customer_id,
-            "delivery_type": str(data_delivery),
-            "items": items,
-            "name": order_name,
-            "project_type": project_type,
-        }
-
-        return parsed_order
+    def __repr__(self):
+        return (
+            f"OrderformParser(project_type={self.project_type},delivery_type={self.delivery_type},customer_id="
+            f"{self.customer_id},order_name={self.order_name})"
+        )

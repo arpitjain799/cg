@@ -1,5 +1,5 @@
-from cg.apps.orderform.orderform_parser import JsonOrderformParser
-from cg.apps.orderform.orderform_schema import OrderformSchema
+from cg.apps.orderform.json_orderform_parser import JsonOrderformParser
+from cg.apps.orderform.schemas.orderform_schema import OrderformSchema
 
 
 def test_parse_rml_orderform(rml_order_to_submit: dict):

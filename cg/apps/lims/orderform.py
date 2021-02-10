@@ -32,17 +32,6 @@ CASE_PROJECT_TYPES = [
 ]
 
 
-class Orderform:
-    """Class to handle order forms"""
-
-    def __init__(self, orderform_file: str):
-        self.orderform_file: Path = Path(orderform_file)
-        if self.orderform_file.suffix == ".xlsx":
-            self.orderform_parser = ExcelOrderformParser()
-        else:
-            self.orderform_parser = JsonOrderformParser()
-
-
 def check_orderform_version(document_title: str) -> None:
     """Raise an error if the orderform is too new or too old for the order portal."""
     for valid_orderform in VALID_ORDERFORMS:
@@ -141,6 +130,7 @@ def get_project_type(document_title: str, parsed_samples: List) -> str:
     elif "1605" in document_title:
         project_type = "metagenome"
     elif "1508" in document_title:
+        # Multiple project types in same ordeform
         analyses = set(sample["data_analysis"] for sample in parsed_samples)
 
         if len(analyses) != 1:

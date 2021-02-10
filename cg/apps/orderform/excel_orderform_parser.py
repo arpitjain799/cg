@@ -4,15 +4,20 @@ from typing import Dict, List
 
 import openpyxl
 from cg.apps.orderform.orderform_parser import OrderformParser
-from cg.apps.orderform.orderform_schema import OrderformSchema
+from cg.apps.orderform.schemas.excel_sample_schema import ExcelSample
+from cg.constants import DataDelivery
 from cg.exc import OrderFormError
+from cg.meta.orders import OrderType
 from openpyxl.workbook import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
+from pydantic import parse_obj_as
 
 LOG = logging.getLogger(__name__)
 
 
 class ExcelOrderformParser(OrderformParser):
+    NO_ANALYSIS: str = "no-analysis"
+    NO_VALUE: str = "no_value"
     SHEET_NAMES: List[str] = ["Orderform", "orderform", "order form"]
     VALID_ORDERFORMS: List[str] = [
         "1508:22",  # Orderform MIP, Balsamic, sequencing only, MIP RNA
@@ -24,6 +29,7 @@ class ExcelOrderformParser(OrderformParser):
 
     def check_orderform_version(self, document_title: str) -> None:
         """Raise an error if the orderform is too new or too old for the order portal."""
+        LOG.info("Validating that %s is a correct ordeform version", document_title)
         for valid_orderform in self.VALID_ORDERFORMS:
             if valid_orderform in document_title:
                 return
@@ -39,7 +45,8 @@ class ExcelOrderformParser(OrderformParser):
             return name
         raise OrderFormError("'orderform' sheet not found in Excel file")
 
-    def get_document_title(self, workbook: Workbook, orderform_sheet: Worksheet) -> str:
+    @staticmethod
+    def get_document_title(workbook: Workbook, orderform_sheet: Worksheet) -> str:
         """Get the document title for the order form.
 
         Openpyxl use 1 based counting
@@ -56,7 +63,8 @@ class ExcelOrderformParser(OrderformParser):
         LOG.info("Found document title %s", document_title)
         return document_title
 
-    def relevant_rows(self, orderform_sheet: Worksheet) -> List[Dict[str, str]]:
+    @staticmethod
+    def relevant_rows(orderform_sheet: Worksheet) -> List[Dict[str, str]]:
         """Get the relevant rows from an order form sheet."""
         raw_samples = []
         current_row = None
@@ -87,6 +95,7 @@ class ExcelOrderformParser(OrderformParser):
                         )
 
                     sample_dict = dict(zip(header_row, values))
+                    sample_dict.pop(None)
                     raw_samples.append(sample_dict)
                 else:
                     empty_row_found = True
@@ -99,81 +108,91 @@ class ExcelOrderformParser(OrderformParser):
                 current_row = "samples"
         return raw_samples
 
-    def parse_sample(self, raw_sample: Dict[str, str]) -> dict:
-        """Parse a raw sample row from order form sheet."""
-        if ":" in raw_sample.get("UDF/Gene List", ""):
-            raw_sample["UDF/Gene List"] = raw_sample["UDF/Gene List"].replace(":", ";")
+    def get_project_type(self, document_title: str) -> str:
+        """Determine the project type and set it to the class."""
+        project_type = None
 
-        if raw_sample["UDF/priority"].lower() == "förtur":
-            raw_sample["UDF/priority"] = "priority"
-        raw_source = raw_sample.get("UDF/Source")
-        sample = {
-            "application": raw_sample["UDF/Sequencing Analysis"],
-            "capture_kit": raw_sample.get("UDF/Capture Library version"),
-            "case": raw_sample.get("UDF/familyID"),
-            "comment": raw_sample.get("UDF/Comment"),
-            "container": raw_sample.get("Container/Type"),
-            "container_name": raw_sample.get("Container/Name"),
-            "custom_index": raw_sample.get("UDF/Custom index"),
-            "customer": raw_sample["UDF/customer"],
-            "data_analysis": raw_sample["UDF/Data Analysis"],
-            "data_delivery": raw_sample.get("UDF/Data Delivery"),
-            "elution_buffer": raw_sample.get("UDF/Sample Buffer"),
-            "extraction_method": raw_sample.get("UDF/Extraction method"),
-            "formalin_fixation_time": raw_sample.get("UDF/Formalin Fixation Time"),
-            "index": raw_sample.get("UDF/Index type"),
-            "from_sample": raw_sample.get("UDF/is_for_sample"),
-            "name": raw_sample["Sample/Name"],
-            "organism": raw_sample.get("UDF/Strain"),
-            "organism_other": raw_sample.get("UDF/Other species"),
-            "panels": (
-                raw_sample["UDF/Gene List"].split(";") if raw_sample.get("UDF/Gene List") else None
-            ),
-            "pool": raw_sample.get("UDF/pool name"),
-            "post_formalin_fixation_time": raw_sample.get("UDF/Post Formalin Fixation Time"),
-            "priority": raw_sample["UDF/priority"].lower()
-            if raw_sample.get("UDF/priority")
-            else None,
-            "reagent_label": raw_sample.get("Sample/Reagent Label"),
-            "reference_genome": raw_sample.get("UDF/Reference Genome Microbial"),
-            "require_qcok": raw_sample.get("UDF/Process only if QC OK") == "yes",
-            "rml_plate_name": raw_sample.get("UDF/RML plate name"),
-            "sex": REV_SEX_MAP.get(raw_sample.get("UDF/Gender", "").strip()),
-            "source": raw_source if raw_source in SOURCE_TYPES else None,
-            "status": raw_sample["UDF/Status"].lower() if raw_sample.get("UDF/Status") else None,
-            "tissue_block_size": raw_sample.get("UDF/Tissue Block Size"),
-            "tumour": raw_sample.get("UDF/tumor") == "yes",
-            "tumour_purity": raw_sample.get("UDF/tumour purity"),
-            "well_position": raw_sample.get("Sample/Well Location"),
-            "well_position_rml": raw_sample.get("UDF/RML well position"),
-        }
+        if "1541" in document_title:
+            project_type = "external"
+        elif "1604" in document_title:
+            project_type = "rml"
+        elif "1603" in document_title:
+            project_type = "microsalt"
+        elif "1605" in document_title:
+            project_type = "metagenome"
+        elif "1508" in document_title:
+            analyses = {sample.data_analysis for sample in self.samples}
 
-        numeric_attributes = [
-            ("index_number", "UDF/Index number"),
-            ("volume", "UDF/Volume (uL)"),
-            ("quantity", "UDF/Quantity"),
-            ("concentration", "UDF/Concentration (nM)"),
-            ("concentration_sample", "UDF/Sample Conc."),
-            ("time_point", "UDF/time_point"),
-        ]
-        for json_key, excel_key in numeric_attributes:
-            str_value = raw_sample.get(excel_key, "").rsplit(".0")[0]
-            if str_value.replace(".", "").isnumeric():
-                sample[json_key] = str_value
+            if len(analyses) != 1:
+                raise OrderFormError(f"mixed 'Data Analysis' types: {', '.join(analyses)}")
 
-        for parent in ["mother", "father"]:
-            parent_key = f"UDF/{parent}ID"
-            sample[parent] = (
-                raw_sample[parent_key]
-                if raw_sample.get(parent_key) and (raw_sample[parent_key] != "0.0")
-                else None
-            )
+            analysis = analyses.pop().lower().replace(" ", "-")
 
-        return sample
+            project_type = "fastq" if analysis == self.NO_ANALYSIS else analysis
+        return project_type
 
-    def parse_orderform(self, excel_path: str) -> OrderformSchema:
+    def is_from_orderform_without_data_delivery(self, data_delivery: str) -> bool:
+        return data_delivery == self.NO_VALUE
+
+    def get_data_delivery(self, project_type: OrderType) -> str:
+        """Determine the order_data delivery type."""
+
+        data_delivery: str = self.parse_data_delivery()
+
+        if self.is_from_orderform_without_data_delivery(data_delivery):
+
+            if project_type == OrderType.FLUFFY:
+                return DataDelivery.NIPT_VIEWER
+
+            if project_type == OrderType.METAGENOME:
+                return DataDelivery.FASTQ
+
+            if project_type == OrderType.MICROSALT:
+                data_analysis: str = self.parse_data_analysis()
+
+                if data_analysis == "custom":
+                    return DataDelivery.FASTQ_QC
+
+                elif data_analysis == "fastq":
+                    return DataDelivery.FASTQ
+
+            if project_type == OrderType.RML:
+                return DataDelivery.FASTQ
+
+            if project_type == OrderType.EXTERNAL:
+                return DataDelivery.SCOUT
+
+            raise OrderFormError(f"Could not determine value for Data Delivery")
+
+        if data_delivery == "analysis-+-bam":
+            return DataDelivery.ANALYSIS_BAM_FILES
+
+        try:
+            return DataDelivery(data_delivery)
+        except ValueError:
+            raise OrderFormError(f"Unsupported Data Delivery: {data_delivery}")
+
+    def parse_data_delivery(self) -> str:
+
+        data_deliveries = {sample.data_delivery or self.NO_VALUE for sample in self.samples}
+
+        if len(data_deliveries) > 1:
+            raise OrderFormError(f"mixed 'Data Delivery' types: {', '.join(data_deliveries)}")
+
+        return data_deliveries.pop().lower().replace(" ", "-")
+
+    def get_customer_id(self) -> str:
+        """Set the customer id"""
+
+        customers = {sample.customer for sample in self.samples}
+        if len(customers) != 1:
+            raise OrderFormError("Invalid customer information: {}".format(customers))
+        return customers.pop()
+
+    def parse_orderform(self, excel_path: str) -> None:
         """Parse out information from an order form."""
 
+        LOG.info("Open excel workbook from file %s", excel_path)
         workbook: Workbook = openpyxl.load_workbook(
             filename=excel_path, read_only=True, data_only=True
         )
@@ -186,40 +205,15 @@ class ExcelOrderformParser(OrderformParser):
         )
         self.check_orderform_version(document_title)
 
-        raw_samples = self.relevant_rows(orderform_sheet)
+        LOG.info("Parsing all samples from orderform")
+        raw_samples: List[dict] = self.relevant_rows(orderform_sheet)
 
-        if len(raw_samples) == 0:
+        if not raw_samples:
             raise OrderFormError("orderform doesn't contain any samples")
-        parsed_samples = [parse_sample(raw_sample) for raw_sample in raw_samples]
-        #
-        # project_type = get_project_type(document_title, parsed_samples)
-        # delivery_type = get_data_delivery(parsed_samples, OrderType(project_type))
-        #
-        # if project_type in CASE_PROJECT_TYPES:
-        #     parsed_cases = group_cases(parsed_samples)
-        #     items = []
-        #     customer_ids = set()
-        #     for case_id, parsed_case in parsed_cases.items():
-        #         customer_id, case_data = expand_case(case_id, parsed_case, delivery_type)
-        #         customer_ids.add(customer_id)
-        #         items.append(case_data)
-        # else:
-        #     customer_ids = set(sample["customer"] for sample in parsed_samples)
-        #     items = parsed_samples
-        #
-        # customer_options = len(customer_ids)
-        # if customer_options == 0:
-        #     raise OrderFormError("Customer information is missing")
-        # elif customer_options != 1:
-        #     raise OrderFormError(f"Samples have different customers: {customer_ids}")
-        #
-        # filename_base = Path(excel_path).stem
-        # parsed_order = {
-        #     "customer": customer_ids.pop(),
-        #     "delivery_type": delivery_type,
-        #     "items": items,
-        #     "name": filename_base,
-        #     "project_type": project_type,
-        # }
 
-        return parsed_order
+        self.samples: List[ExcelSample] = parse_obj_as(List[ExcelSample], raw_samples)
+        self.project_type: str = self.get_project_type(document_title)
+        self.delivery_type = self.get_data_delivery(project_type=OrderType(self.project_type))
+        self.customer_id = self.get_customer_id()
+
+        self.order_name = Path(excel_path).stem
