@@ -105,10 +105,15 @@ class ExcelSample(OrderSample):
             separator = ":"
         return value.split(separator)
 
-    @validator("priority", "status", "data_delivery")
+    @validator("data_delivery")
+    def validate_data_delivery(cls, value: Optional[str]):
+        value = value.lower()
+        if value == "analysis + bam":
+            return "analysis-bam"
+        return value
+
+    @validator("priority", "status")
     def convert_to_lower(cls, value: Optional[str]):
-        if not value:
-            return None
         value = value.lower()
         if value == "förtur":
             return "priority"

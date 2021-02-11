@@ -15,6 +15,20 @@ def get_sample_obj(
             return sample_obj
 
 
+def test_parse_balsamic_orderform(balsamic_orderform: str):
+    """Test to parse an balsamic orderform in excel format"""
+    # GIVEN a orderform in excel format
+    assert Path(balsamic_orderform).suffix == ".xlsx"
+    # GIVEN a orderform API
+    orderform_parser: ExcelOrderformParser = ExcelOrderformParser()
+
+    # WHEN parsing the orderform
+    orderform_parser.parse_orderform(excel_path=balsamic_orderform)
+
+    # THEN assert that the project type is correct
+    assert orderform_parser.project_type == "balsamic"
+
+
 def test_parse_microbial_orderform(microbial_orderform: str):
     """Test to parse an microbial orderform in excel format"""
     # GIVEN a order form in excel format

@@ -69,6 +69,35 @@ def test_excel_with_panels(minimal_excel_sample: dict):
     assert set(excel_sample.panels) == set([panel_1, panel_2])
 
 
+def test_balsamic_sample_is_correct(balsamic_orderform_sample: dict):
+    """Test that a balsamic orderform sample is parsed correct"""
+    # GIVEN sample data about a known balsamic sample
+
+    # WHEN parsing the sample
+    balsamic_sample: ExcelSample = ExcelSample(**balsamic_orderform_sample)
+
+    # THEN assert that the sample information is parsed correct
+    assert balsamic_sample.name == "s1"
+    assert balsamic_sample.container == "96 well plate"
+    assert balsamic_sample.data_analysis == "Balsamic"
+    assert balsamic_sample.data_delivery == str(DataDelivery.ANALYSIS_BAM_FILES)
+    assert balsamic_sample.application == "PANKTTR010"
+    assert balsamic_sample.sex == "male"
+    assert balsamic_sample.volume == "1"
+    assert balsamic_sample.source == "tissue (FFPE)"
+    assert balsamic_sample.container_name == "plate1"
+    assert balsamic_sample.well_position == "A:1"
+    assert balsamic_sample.elution_buffer == 'Other (specify in "Comments")'
+    assert balsamic_sample.tumour is True
+    assert balsamic_sample.capture_kit == "GMCKsolid"
+    assert balsamic_sample.tumour_purity == "5"
+    assert balsamic_sample.formalin_fixation_time == "2"
+    assert balsamic_sample.post_formalin_fixation_time == "3"
+    assert balsamic_sample.tissue_block_size == "small"
+    assert balsamic_sample.quantity == "4"
+    assert balsamic_sample.comment == "other Elution buffer"
+
+
 def test_microsalt_sample_is_correct(microbial_orderform_sample: dict):
     """Test that a microbial orderform sample is parsed correct"""
     # GIVEN sample data about a known microbial sample
