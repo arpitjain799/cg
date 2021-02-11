@@ -61,13 +61,67 @@ def test_excel_with_panels(minimal_excel_sample: dict):
     panel_1 = "OMIM"
     panel_2 = "PID"
     minimal_excel_sample["UDF/Gene List"] = ";".join([panel_1, panel_2])
-    print(minimal_excel_sample)
 
     # WHEN creating a excel sample
     excel_sample: ExcelSample = ExcelSample(**minimal_excel_sample)
 
     # THEN assert that the panels was parsed into a list
     assert set(excel_sample.panels) == set([panel_1, panel_2])
+
+
+def test_microsalt_sample_is_correct(microbial_orderform_sample: dict):
+    """Test that a microbial orderform sample is parsed correct"""
+    # GIVEN sample data about a known microbial sample
+
+    # WHEN parsing the sample
+    microbial_sample: ExcelSample = ExcelSample(**microbial_orderform_sample)
+
+    # THEN assert that the sample information is parsed correct
+    assert microbial_sample.name == "s1"
+    assert microbial_sample.organism == "other"
+    assert microbial_sample.reference_genome == "NC_00001"
+    assert microbial_sample.data_analysis == "fastq"
+    assert microbial_sample.application == "MWRNXTR003"
+    # customer on order (data)
+    assert microbial_sample.require_qcok is True
+    assert microbial_sample.elution_buffer == 'Other (specify in "Comments")'
+    assert microbial_sample.extraction_method == "other (specify in comment field)"
+    assert microbial_sample.container == "96 well plate"
+    assert microbial_sample.priority in "research"
+    assert microbial_sample.container_name == "plate1"
+    assert microbial_sample.well_position == "A:1"
+    assert microbial_sample.organism_other == "other species"
+    assert microbial_sample.concentration_sample == "1"
+    assert microbial_sample.quantity == "2"
+    assert microbial_sample.comment == "comment"
+
+
+def test_metagenome_sample_is_correct(metagenome_orderform_sample: dict):
+    """Test that a metagenome orderform sample is parsed correct"""
+    # GIVEN sample data about a know metagenome sample
+
+    # WHEN parsing the sample
+    metagenome_sample: ExcelSample = ExcelSample(**metagenome_orderform_sample)
+
+    assert metagenome_sample.name == "sample1"
+    assert metagenome_sample.source == "other"
+    assert metagenome_sample.data_analysis == "fastq"
+    assert metagenome_sample.application == "METPCFR030"
+    assert metagenome_sample.customer == "cust000"
+    assert metagenome_sample.require_qcok is True
+    assert metagenome_sample.elution_buffer == 'Other (specify in "Comments")'
+    assert metagenome_sample.extraction_method == "other (specify in comment field)"
+    assert metagenome_sample.container == "96 well plate"
+    assert metagenome_sample.priority == "research"
+
+    # Required if Plate
+    assert metagenome_sample.container_name == "plate1"
+    assert metagenome_sample.well_position == "A:1"
+
+    # These fields are not required
+    assert metagenome_sample.concentration_sample == "1"
+    assert metagenome_sample.quantity == "2"
+    assert metagenome_sample.comment == "comment"
 
 
 def test_mip_sample_is_correct(mip_orderform_sample: dict):

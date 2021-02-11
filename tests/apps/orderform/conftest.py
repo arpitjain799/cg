@@ -99,6 +99,53 @@ def fixture_nr_samples_fastq_orderform(fastq_orderform: str) -> int:
     return get_nr_samples_excel(fastq_orderform)
 
 
+@pytest.fixture(name="microbial_orderform_sample")
+def fixture_microbial_orderform_sample() -> dict:
+    """Return a raw parsed microbial sample in excel format"""
+    return {
+        "Sample/Name": "s1",
+        "UDF/Strain": "other",
+        "UDF/Reference Genome Microbial": "NC_00001",
+        "UDF/Data Analysis": "fastq",
+        "UDF/Sequencing Analysis": "MWRNXTR003",
+        "UDF/customer": "cust000",
+        "UDF/Process only if QC OK": "yes",
+        "UDF/Sample Buffer": 'Other (specify in "Comments")',
+        "UDF/Extraction method": "other (specify in comment field)",
+        "Container/Type": "96 well plate",
+        "UDF/priority": "research",
+        "Container/Name": "plate1",
+        "Sample/Well Location": "A:1",
+        "UDF/Other species": "other species",
+        "UDF/Sample Conc.": "1",
+        "UDF/Quantity": "2",
+        "UDF/Comment": "comment",
+        "UDF/Reference Genome": "hg19",
+    }
+
+
+@pytest.fixture(name="metagenome_orderform_sample")
+def fixture_metagenome_orderform_sample() -> dict:
+    """Return a raw parsed metagenome sample in excel format"""
+    return {
+        "Sample/Name": "sample1",
+        "UDF/Source": "other",
+        "UDF/Data Analysis": "fastq",
+        "UDF/Sequencing Analysis": "METPCFR030",
+        "UDF/customer": "cust000",
+        "UDF/Process only if QC OK": "yes",
+        "UDF/Sample Buffer": 'Other (specify in "Comments")',
+        "UDF/Extraction method": "other (specify in comment field)",
+        "Container/Type": "96 well plate",
+        "UDF/priority": "research",
+        "Container/Name": "plate1",
+        "Sample/Well Location": "A:1",
+        "UDF/Sample Conc.": "1",
+        "UDF/Quantity": "2",
+        "UDF/Comment": "comment",
+    }
+
+
 @pytest.fixture(name="mip_orderform_sample")
 def fixture_mip_orderform_sample() -> dict:
     """Return a raw parsed mip sample in excel format"""

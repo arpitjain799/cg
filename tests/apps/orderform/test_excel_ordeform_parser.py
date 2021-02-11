@@ -15,6 +15,34 @@ def get_sample_obj(
             return sample_obj
 
 
+def test_parse_microbial_orderform(microbial_orderform: str):
+    """Test to parse an microbial orderform in excel format"""
+    # GIVEN a order form in excel format
+    assert Path(microbial_orderform).suffix == ".xlsx"
+    # GIVEN a orderform API
+    orderform_parser: ExcelOrderformParser = ExcelOrderformParser()
+
+    # WHEN parsing the orderform
+    orderform_parser.parse_orderform(excel_path=microbial_orderform)
+
+    # THEN assert that the project type is correct
+    assert orderform_parser.project_type == "microsalt"
+
+
+def test_parse_metagenome_orderform(metagenome_orderform: str):
+    """Test to parse an metagenome orderform in excel format"""
+    # GIVEN a order form in excel format
+    assert Path(metagenome_orderform).suffix == ".xlsx"
+    # GIVEN a orderform API
+    orderform_parser: ExcelOrderformParser = ExcelOrderformParser()
+
+    # WHEN parsing the orderform
+    orderform_parser.parse_orderform(excel_path=metagenome_orderform)
+
+    # THEN assert that the project type is correct
+    assert orderform_parser.project_type == "metagenome"
+
+
 def test_parse_external_orderform(external_orderform: str):
     """Test to parse a external orderform in xlsx format"""
     # GIVEN a orderform in excel format

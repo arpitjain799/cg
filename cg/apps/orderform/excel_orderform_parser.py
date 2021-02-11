@@ -134,6 +134,14 @@ class ExcelOrderformParser(OrderformParser):
             project_type = "fastq" if analysis == self.NO_ANALYSIS else analysis
         return project_type
 
+    def parse_data_analysis(self) -> str:
+        data_analyses = {sample.data_analysis for sample in self.samples if sample.data_analysis}
+
+        if len(data_analyses) > 1:
+            raise OrderFormError(f"mixed 'Data Analysis' types: {', '.join(data_analyses)}")
+
+        return data_analyses.pop().lower().replace(" ", "-")
+
     def is_from_orderform_without_data_delivery(self, data_delivery: str) -> bool:
         return data_delivery == self.NO_VALUE
 
