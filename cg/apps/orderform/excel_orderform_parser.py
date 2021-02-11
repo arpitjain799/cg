@@ -84,6 +84,8 @@ class ExcelOrderformParser(OrderformParser):
                     value = str(cell.value)
                     if value == "None":
                         value = ""
+                    if value == "NA":
+                        value = None
                     values.append(value)
 
                 # skip empty rows
@@ -96,7 +98,7 @@ class ExcelOrderformParser(OrderformParser):
 
                     sample_dict = dict(zip(header_row, values))
                     sample_dict.pop(None)
-                    # print(sample_dict)
+                    print(sample_dict)
                     raw_samples.append(sample_dict)
                 else:
                     empty_row_found = True

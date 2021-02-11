@@ -59,6 +59,7 @@ class ExcelSample(OrderSample):
             "Balsamic",
             "fastq",
             "custom",
+            "scout",
             "No analysis",
         ]
         if value not in data_analysis_alternatives:

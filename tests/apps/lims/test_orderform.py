@@ -2,53 +2,6 @@ from cg.apps.lims import orderform
 from cg.constants import DataDelivery, Pipeline
 
 
-def test_parsing_external_orderform(external_orderform):
-
-    # GIVEN an orderform for two external samples, one WES, one WGS
-    # WHEN parsing the file
-    data = orderform.parse_orderform(external_orderform)
-
-    # THEN it should detect the project type
-    assert data["project_type"] == "external"
-    assert data["customer"] == "cust002"
-
-    # ... and find all families (1) and samples (2)
-    assert len(data["items"]) == 4
-    family = data["items"][0]
-    assert family["name"] == "fam2"
-    assert family["priority"] == "standard"
-    assert set(family["panels"]) == set(["CILM", "CTD"])
-    # todo: assert set(case['additional_gene_list']) == set(['16PDEL'])
-
-    # ... and collect info about the samples
-    wes_sample = family["samples"][0]
-    wgs_sample = family["samples"][1]
-
-    assert wes_sample["capture_kit"] == "Agilent Sureselect V5"
-    assert wes_sample["application"] == "EXXCUSR000"
-    assert wes_sample["data_analysis"] == "scout"
-    assert wes_sample["sex"] == "male"
-    # case name on case
-    # priority on case
-    # customer on order (data)
-    assert wes_sample["source"] == "blood"
-
-    # panels on case
-    # additional gene list on case
-    assert wes_sample["status"] == "affected"
-
-    assert wes_sample["mother"] == "mother"
-    assert wes_sample["father"] == "father"
-    # todo: assert wes_sample['other'] == 'other', check if removed in latest OF
-
-    # todo: assert wes_sample['tumour'] == 'Tumor'
-    # todo: assert wes_sample['gel_picture'] == 'Y'
-    # todo: assert wes_sample['extraction_method'] == 'extraction method'
-    assert wes_sample["comment"] == "sample comment"
-
-    assert wgs_sample.get("capture_kit") == "Agilent Sureselect CRE"
-
-
 def test_parsing_metagenome_orderform(metagenome_orderform):
 
     # GIVEN an orderform for one metagenome sample
