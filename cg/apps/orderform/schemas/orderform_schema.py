@@ -63,6 +63,7 @@ class OrderSample(BaseModel):
     index: str
     index_number: Optional[int]
     index_sequence: Optional[str]
+    internal_id: Optional[str]
     mother: Optional[str]
     name: constr(regex=NAME_PATTERN)
     organism: Optional[str]
@@ -163,6 +164,7 @@ class OrderformSchema(BaseModel):
     project_type: str
     customer: str
     name: str
+    ticket: Optional[int] = None
     samples: List[OrderSample]
     cases: List[OrderCase] = None
 

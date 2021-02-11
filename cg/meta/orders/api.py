@@ -10,18 +10,23 @@ import datetime as dt
 import logging
 import re
 import typing
-from typing import List
+from typing import List, Optional
 
 from cg.apps.lims import LimsAPI
 from cg.apps.osticket import OsTicket
 from cg.constants import DataDelivery, Pipeline
 from cg.exc import OrderError, TicketCreationError
 from cg.store import Store, models
+from ...apps.orderform.json_orderform_parser import JsonOrderformParser
+from ...apps.orderform.schemas.orderform_schema import OrderSample, OrderformSchema
+from ...server.schemas.order import OrderIn
 
+from ...server.schemas.ticket import TicketIn
 from .lims import LimsHandler
 from .rml_order_form import Orderform, StatusData
 from .schema import ORDER_SCHEMES, OrderType
 from .status import StatusHandler
+from .ticket_handler import TicketHandler
 
 LOG = logging.getLogger(__name__)
 NEW_LINE = "<br />"
@@ -30,31 +35,48 @@ NEW_LINE = "<br />"
 class OrdersAPI(LimsHandler, StatusHandler):
     """Orders API for accepting new samples into the system."""
 
+    IMPORTED_SAMPLES_ALLOWED: List[str] = [
+        OrderType.BALSAMIC,
+        OrderType.EXTERNAL,
+        OrderType.MIP_DNA,
+        OrderType.MIP_RNA,
+    ]
+
     def __init__(self, lims: LimsAPI, status: Store, osticket: OsTicket = None):
         super().__init__()
         self.lims = lims
         self.status = status
         self.osticket = osticket
+        self.ticket_handler: Optional[TicketHandler] = None
+        if osticket:
+            self.ticket_handler = TicketHandler(osticket)
 
-    def submit(self, project: OrderType, order: dict, ticket: dict) -> dict:
+    def submit(self, project: OrderType, order: OrderIn, ticket: TicketIn) -> dict:
         """Submit a batch of samples.
 
         Main entry point for the class towards interfaces that implements it.
+
+        Project describes what project type that is being submitted
+        Order is a dictionary with all samples that are fetched from the front end
+
         """
+        order_parser: JsonOrderformParser = JsonOrderformParser()
         try:
             ORDER_SCHEMES[project].validate(order)
         except (ValueError, TypeError) as error:
             raise OrderError(error.args[0])
-
-        self._validate_customer_on_imported_samples(project, order)
+        order: OrderformSchema = order_parser.generate_orderform()
+        # Validate that the customer have access to all samples in order
+        self._validate_customer_on_imported_samples(
+            project=project, samples=order.samples, customer_id=order.customer
+        )
 
         # detect manual ticket assignment
-        ticket_match = re.fullmatch(r"#([0-9]{6})", order["name"])
+        ticket_number: Optional[int] = TicketHandler.parse_ticket_number(order.name)
 
-        if ticket_match:
-            ticket_number = int(ticket_match.group(1))
-            LOG.info("%s: detected ticket in order name", ticket_number)
-            order["ticket"] = ticket_number
+        if ticket_number:
+            order.ticket = ticket_number
+
         else:
             # open and assign ticket to order
             try:
@@ -64,9 +86,9 @@ class OrdersAPI(LimsHandler, StatusHandler):
                     )
 
                     order["ticket"] = self.osticket.open_ticket(
-                        name=ticket["name"],
-                        email=ticket["email"],
-                        subject=order["name"],
+                        name=ticket.name,
+                        email=ticket.email,
+                        subject=order.name,
                         message=message,
                     )
 
@@ -347,30 +369,22 @@ class OrdersAPI(LimsHandler, StatusHandler):
             )
             sample["verified_organism"] = is_verified
 
-    def _validate_customer_on_imported_samples(self, project: OrderType, order: dict):
+    def _validate_customer_on_imported_samples(
+        self, project: OrderType, samples: List[OrderSample], customer_id: str
+    ):
         """Validate that the customer have access to all samples"""
-        for sample in order.get("samples"):
-
-            if sample.get("internal_id") is None:
+        for sample in samples:
+            if sample.internal_id is None:
+                # sample has not been given a internal id
                 continue
-
-            if project not in (
-                OrderType.BALSAMIC,
-                OrderType.EXTERNAL,
-                OrderType.MIP_DNA,
-                OrderType.MIP_RNA,
-            ):
+            if project not in self.IMPORTED_SAMPLES_ALLOWED:
                 raise OrderError(
-                    f"Only MIP, Balsamic and external orders can have imported "
-                    f"samples: "
-                    f"{sample.get('name')}"
+                    f"Only MIP, Balsamic and external orders can have imported samples: {sample.name}"
                 )
-
-            existing_sample = self.status.sample(sample.get("internal_id"))
-            data_customer = self.status.customer(order["customer"])
-
+            existing_sample: models.Sample = self.status.sample(sample.internal_id)
+            data_customer: models.Customer = self.status.customer(customer_id)
             if existing_sample.customer.customer_group_id != data_customer.customer_group_id:
-                raise OrderError(f"Sample not available: {sample.get('name')}")
+                raise OrderError(f"Sample not available: {sample.name}")
 
     def _get_submit_func(self, project_type: OrderType) -> typing.Callable:
         """Get the submit method to call for the given type of project"""

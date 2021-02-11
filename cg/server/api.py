@@ -18,6 +18,8 @@ from ..apps.orderform.excel_orderform_parser import ExcelOrderformParser
 from ..apps.orderform.json_orderform_parser import JsonOrderformParser
 from ..apps.orderform.schemas.orderform_schema import OrderformSchema
 from .ext import db, lims, osticket
+from .schemas.order import OrderIn
+from .schemas.ticket import TicketIn
 
 LOG = logging.getLogger(__name__)
 BLUEPRINT = Blueprint("api", __name__, url_prefix="/api/v1")
@@ -60,11 +62,11 @@ def before_request():
 def submit_order(order_type):
     """Submit an order for samples."""
     api = OrdersAPI(lims=lims, status=db, osticket=osticket)
-    post_data = request.get_json()
+    post_data: OrderIn = OrderIn(**request.get_json())
     LOG.info("processing '%s' order: %s", order_type, post_data)
     try:
-        ticket = {"name": g.current_user.name, "email": g.current_user.email}
-        result = api.submit(OrderType(order_type), post_data, ticket=ticket)
+        ticket: TicketIn = TicketIn(name=g.current_user.name, email=g.current_user.email)
+        result = api.submit(project=OrderType(order_type), order=post_data, ticket=ticket)
     except (DuplicateRecordError, OrderError) as error:
         return abort(make_response(jsonify(message=error.message), 401))
     except HTTPError as error:

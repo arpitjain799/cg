@@ -40,6 +40,7 @@ Flask-SQLAlchemy = "==2.1"
 Werkzeug = "<1.0"
 "ruamel.yaml" = "*"
 cg = {editable = true,path = "."}
+email-validator = "*"
 
 [requires]
 python_version = "3.7"
