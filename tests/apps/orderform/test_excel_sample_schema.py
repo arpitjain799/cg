@@ -69,6 +69,34 @@ def test_excel_with_panels(minimal_excel_sample: dict):
     assert set(excel_sample.panels) == set([panel_1, panel_2])
 
 
+def test_mip_rna_sample_is_correct(mip_rna_orderform_sample: dict):
+    """Test that a mip rna orderform sample in parsed correct"""
+    # GIVEN sample data about a known balsamic sample
+
+    # WHEN parsing the sample
+    mip_rna_sample: ExcelSample = ExcelSample(**mip_rna_orderform_sample)
+
+    # THEN assert that the sample information is parsed correct
+    assert mip_rna_sample.name == "s1"
+    assert mip_rna_sample.container == "96 well plate"
+    assert mip_rna_sample.data_analysis == "MIP RNA"
+    assert mip_rna_sample.data_delivery.lower() == str(DataDelivery.ANALYSIS_FILES)
+    assert mip_rna_sample.application == "RNAPOAR025"
+    assert mip_rna_sample.sex == "male"
+    # case-id on the case
+    # customer on the order (data)
+    # require-qc-ok on the case
+    assert mip_rna_sample.source == "tissue (FFPE)"
+
+    assert mip_rna_sample.container_name == "plate1"
+    assert mip_rna_sample.well_position == "A:1"
+    assert mip_rna_sample.tumour is True
+    assert mip_rna_sample.quantity == "4"
+    assert mip_rna_sample.comment == "other Elution buffer"
+    assert mip_rna_sample.from_sample == "s1"
+    assert mip_rna_sample.time_point == "0"
+
+
 def test_balsamic_sample_is_correct(balsamic_orderform_sample: dict):
     """Test that a balsamic orderform sample is parsed correct"""
     # GIVEN sample data about a known balsamic sample

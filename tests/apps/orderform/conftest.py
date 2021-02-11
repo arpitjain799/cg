@@ -99,6 +99,42 @@ def fixture_nr_samples_fastq_orderform(fastq_orderform: str) -> int:
     return get_nr_samples_excel(fastq_orderform)
 
 
+@pytest.fixture(name="mip_rna_orderform_sample")
+def fixture_mip_rna_orderform_sample() -> dict:
+    """Return a raw parsed mip rna sample in excel format"""
+    return {
+        "Sample/Name": "s1",
+        "UDF/customer": "cust000",
+        "UDF/Data Analysis": "MIP RNA",
+        "UDF/Data Delivery": "Analysis",
+        "UDF/Sequencing Analysis": "RNAPOAR025",
+        "UDF/familyID": "c1",
+        "UDF/Gender": "M",
+        "UDF/tumor": "yes",
+        "UDF/Source": "tissue (FFPE)",
+        "UDF/priority": "research",
+        "UDF/Process only if QC OK": "yes",
+        "UDF/Volume (uL)": "1",
+        "Container/Type": "96 well plate",
+        "Container/Name": "plate1",
+        "Sample/Well Location": "A:1",
+        "UDF/Gene List": "",
+        "UDF/Status": "",
+        "UDF/motherID": "",
+        "UDF/fatherID": "",
+        "UDF/is_for_sample": "s1",
+        "UDF/time_point": "0",
+        "UDF/Capture Library version": "GMCKsolid",
+        "UDF/Sample Buffer": 'Other (specify in "Comments")',
+        "UDF/Formalin Fixation Time": "2",
+        "UDF/Post Formalin Fixation Time": "3",
+        "UDF/Tissue Block Size": "small",
+        "UDF/Quantity": "4",
+        "UDF/tumour purity": "5",
+        "UDF/Comment": "other Elution buffer",
+    }
+
+
 @pytest.fixture(name="balsamic_orderform_sample")
 def fixture_balsamic_orderform_sample() -> dict:
     """Return a raw parsed balsamic sample in excel format"""

@@ -15,6 +15,20 @@ def get_sample_obj(
             return sample_obj
 
 
+def test_parse_mip_rna_orderform(mip_rna_orderform: str):
+    """Test to parse an mip rna orderform in excel format"""
+    # GIVEN a orderform in excel format
+    assert Path(mip_rna_orderform).suffix == ".xlsx"
+    # GIVEN a orderform API
+    orderform_parser: ExcelOrderformParser = ExcelOrderformParser()
+
+    # WHEN parsing the orderform
+    orderform_parser.parse_orderform(excel_path=mip_rna_orderform)
+
+    # THEN assert that the project type is correct
+    assert orderform_parser.project_type == "mip-rna"
+
+
 def test_parse_balsamic_orderform(balsamic_orderform: str):
     """Test to parse an balsamic orderform in excel format"""
     # GIVEN a orderform in excel format
