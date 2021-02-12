@@ -4,6 +4,8 @@ from typing import Optional
 
 from cg.apps.orderform.schemas.orderform_schema import OrderformSchema
 from cg.apps.osticket import OsTicket
+from cg.exc import TicketCreationError
+from cg.server.schemas.ticket import TicketIn
 from cg.store import Store, models
 
 LOG = logging.getLogger(__name__)
@@ -30,7 +32,30 @@ class TicketHandler:
         LOG.info("Could not detected ticket number in name %s", name)
         return None
 
-    def create_new_ticket_message(self, order: OrderformSchema, ticket: dict, project: str) -> str:
+    def create_ticket(
+        self, order: OrderformSchema, ticket: TicketIn, project: str
+    ) -> Optional[int]:
+        """Create a ticket and return the ticket number"""
+        message = self.create_new_ticket_message(order=order, ticket=ticket, project=project)
+        ticket_nr = None
+        try:
+            ticket_nr: int = int(
+                self.osticket.open_ticket(
+                    name=ticket.name,
+                    email=ticket.email,
+                    subject=order.name,
+                    message=message,
+                )
+            )
+            LOG.info(f"{ticket_nr}: opened new ticket")
+        except TicketCreationError as error:
+            LOG.warning(error.message)
+
+        return ticket_nr
+
+    def create_new_ticket_message(
+        self, order: OrderformSchema, ticket: TicketIn, project: str
+    ) -> str:
         message = f"data:text/html;charset=utf-8,New incoming {project} samples: "
 
         for sample in order.samples:
@@ -44,9 +69,9 @@ class TicketHandler:
             self.add_sample_comment_to_message(message=message, comment=sample.comment)
 
         message += self.NEW_LINE
-        message = self.add_comment_to_message(order, message)
-        message = self._add_user_name_to_message(message, ticket)
-        message = self._add_customer_to_message(order, message)
+        self.add_order_comment_to_message(message=message, comment=order.comment)
+        self.add_user_name_to_message(message=message, name=ticket.name)
+        self.add_customer_to_message(message=message, customer_id=order.customer)
 
         return message
 
@@ -85,16 +110,16 @@ class TicketHandler:
         if comment:
             message += ", " + comment
 
-    def add_comment_to_message(self, comment: Optional[str], message: str):
+    def add_order_comment_to_message(self, message: str, comment: Optional[str]) -> None:
         if not comment:
-            return message
-
+            return
         message += self.NEW_LINE + f"{comment}."
-        return message
 
-    def add_user_name_to_message(self, name: Optional[None], message: str):
+    def add_user_name_to_message(self, message: str, name: Optional[str]):
         if not name:
-            return message
-
+            return
         message += self.NEW_LINE + f"{name}"
-        return message
+
+    def add_customer_to_message(self, message: str, customer_id: str) -> None:
+        customer: models.Customer = self.status_db.customer(customer_id)
+        message += f", {customer.name} ({customer_id})"
