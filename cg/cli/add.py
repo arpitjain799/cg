@@ -1,5 +1,4 @@
-# Writing some spaces or not
-
+# New stuff
 import logging
 
 import click
