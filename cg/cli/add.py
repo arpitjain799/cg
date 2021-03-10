@@ -1,4 +1,3 @@
-# New stuff
 import logging
 
 import click
