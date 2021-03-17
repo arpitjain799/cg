@@ -126,6 +126,7 @@ def reagent_labels(context, days: int):
 def bioinfo(context, case_name, cleanup, target_load, dry):
     """Load bioinfo case results to the trending database"""
 
+    context.obj["housekeeper_api"] = HousekeeperAPI(context.obj)
     hk_api = context.obj["housekeeper_api"]
     store = context.obj["status_db"]
 
@@ -183,6 +184,7 @@ def bioinfo(context, case_name, cleanup, target_load, dry):
 def bioinfo_all(context, dry):
     """Load all cases with recent analysis and a multiqc-json to the trending database."""
 
+    context.obj["housekeeper_api"] = HousekeeperAPI(context.obj)
     hk_api = context.obj["housekeeper_api"]
     store = context.obj["status_db"]
     cases = store.families()
