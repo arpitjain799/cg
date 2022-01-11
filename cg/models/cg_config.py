@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, Extra
 from typing_extensions import Literal
 
 from cg.apps.cgstats.stats import StatsAPI
@@ -67,6 +67,9 @@ class CommonAppConfig(BaseModel):
     binary_path: str
     config_path: Optional[str]
     deploy_config: Optional[str]
+
+    class Config:
+        extra = Extra.allow
 
 
 class FluffyUploadConfig(BaseModel):
