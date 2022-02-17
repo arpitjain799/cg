@@ -194,3 +194,13 @@ def start_available(context: click.Context, dry_run: bool = False):
             exit_code = EXIT_FAIL
     if exit_code:
         raise click.Abort
+
+
+@click.command("melter-runs")
+@OPTION_DRY
+@click.pass_context
+def start_melter_cases(context: click.Context, dry_run: bool = False):
+    """Start MIP analyses that melter indicates should be reanalysed"""
+
+    analysis_api: MipAnalysisAPI = context.obj.meta_apis["analysis_api"]
+
