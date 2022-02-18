@@ -16,6 +16,7 @@ from cg.cli.workflow.mip.options import (
     START_WITH_PROGRAM,
 )
 from cg.constants import EXIT_FAIL, EXIT_SUCCESS
+from cg.constants.priority import SlurmQos
 from cg.exc import CgError, DecompressionNeededError, FlowcellsNeededError
 from cg.meta.workflow.mip import MipAnalysisAPI
 from cg.models.cg_config import CGConfig
@@ -196,11 +197,19 @@ def start_available(context: click.Context, dry_run: bool = False):
         raise click.Abort
 
 
-@click.command("melter-runs")
+@click.command("melter-run")
 @OPTION_DRY
 @click.pass_context
-def start_melter_cases(context: click.Context, dry_run: bool = False):
+def start_melter_case(
+    context: click.Context,
+    case_id: str,
+    dry_run: bool,
+    panel_bed: str,
+    priority: str = SlurmQos.LOW,
+):
     """Start MIP analyses that melter indicates should be reanalysed"""
 
     analysis_api: MipAnalysisAPI = context.obj.meta_apis["analysis_api"]
 
+    analysis_api.verify_case_id_in_statusdb(case_id=case_id)
+    LOG.info("Melter is starting MIP analysis workflow for case %s", case_id)
