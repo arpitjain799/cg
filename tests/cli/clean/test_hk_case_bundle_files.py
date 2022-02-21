@@ -8,7 +8,7 @@ from cg.models.cg_config import CGConfig
 from click.testing import CliRunner
 from tests.store_helpers import StoreHelpers
 
-from cg.cli.clean import hk_case_bundle_files
+from cg.cli.clean import hk_case_bundle_files, PIPELINE_PROTECTED_TAGS
 
 from cg.store import Store
 
@@ -52,9 +52,9 @@ def test_clean_hk_case_files_too_old(cli_runner: CliRunner, clean_context: CGCon
     assert not context.status_db.get_analyses_before_date(before=date_one_year_ago).all()
 
     # WHEN running the clean command
-    caplog.set_level(logging.INFO)
+    caplog.set_level(logging.DEBUG)
     result = cli_runner.invoke(
-        hk_case_bundle_files, ["--days-old", days_ago, "--dry-run"], obj=context
+        hk_case_bundle_files, ["--days-old", days_ago, "--dry-run"], obj=context, catch_exceptions=False
     )
 
     # THEN it should be successful
@@ -77,7 +77,8 @@ def test_clean_hk_case_files_single_analysis(
     date_days_ago: dt.datetime = get_date_days_ago(days_ago)
     pipeline: Pipeline = Pipeline.MIP_DNA
 
-    analysis: models.Analysis = helpers.add_analysis(store=store, started_at=date_days_ago, completed_at=date_days_ago, pipeline=pipeline)
+    analysis: models.Analysis = helpers.add_analysis(store=store, started_at=date_days_ago, completed_at=date_days_ago,
+                                                     pipeline=pipeline)
     bundle_name: str = analysis.family.internal_id
 
     # GIVEN a housekeeper api with some alignment files
@@ -90,12 +91,12 @@ def test_clean_hk_case_files_single_analysis(
             {"path": file_path, "archive": False, "tags": [bundle_name, "cram"]},
         ],
     }
-    hk_models.Bundle = helpers.ensure_hk_bundle(cg_context.housekeeper_api, bundle_data=hk_bundle_data)
+    helpers.ensure_hk_bundle(cg_context.housekeeper_api, bundle_data=hk_bundle_data)
 
     # WHEN running the clean command
     caplog.set_level(logging.DEBUG)
     result = cli_runner.invoke(
-        hk_case_bundle_files, ["--days-old", days_ago, "--dry-run"], obj=context, catch_exceptions=False
+        hk_case_bundle_files, ["--days-old", days_ago, "--dry-run"], obj=context
     )
 
     # THEN it should be successful
@@ -122,20 +123,23 @@ def test_clean_hk_case_files_analysis_with_protected_tag(
     date_days_ago: dt.datetime = get_date_days_ago(days_ago)
     pipeline: Pipeline = Pipeline.MIP_DNA
 
-    analysis: models.Analysis = helpers.add_analysis(store=store, started_at=date_days_ago, completed_at=date_days_ago, pipeline=pipeline)
+    analysis: models.Analysis = helpers.add_analysis(store=store, started_at=date_days_ago, completed_at=date_days_ago,
+                                                     pipeline=pipeline)
     bundle_name: str = analysis.family.internal_id
 
-    # GIVEN a housekeeper api with some alignment files
+    # GIVEN a housekeeper api with some alignment files with protected tags
+    protected_tags = PIPELINE_PROTECTED_TAGS[pipeline][0]
     file_path = "path/to_file.fastq"
     hk_bundle_data = {
         "name": bundle_name,
         "created": timestamp,
         "expires": timestamp,
         "files": [
-            {"path": file_path, "archive": False, "tags": [bundle_name, "fastq"]},
+            {"path": file_path, "archive": False, "tags": protected_tags},
         ],
     }
-    hk_models.Bundle = helpers.ensure_hk_bundle(cg_context.housekeeper_api, bundle_data=hk_bundle_data)
+    print(f"{hk_bundle_data=}")
+    helpers.ensure_hk_bundle(cg_context.housekeeper_api, bundle_data=hk_bundle_data)
 
     # WHEN running the clean command
     caplog.set_level(logging.DEBUG)
